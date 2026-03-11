@@ -273,6 +273,34 @@ class TestStubSpecification < Gem::TestCase
     assert bar.to_spec
   end
 
+  def test_initialize_with_files_stub
+    stub = stub_with_files
+
+    assert_equal "stub_f",                    stub.name
+    assert_equal v(2),                        stub.version
+    assert_equal Gem::Platform::RUBY,         stub.platform
+    assert_equal ["lib"],                     stub.require_paths
+    assert_equal %w[lib/stub_f.rb lib/stub_f/util.rb], stub.files
+    assert stub.stubbed?
+  end
+
+  def test_initialize_with_extension_and_files_stub
+    stub = stub_with_extension_and_files
+
+    assert_equal "stub_ef",                   stub.name
+    assert_equal v(2),                        stub.version
+    assert_equal %w[ext/stub_ef/extconf.rb],  stub.extensions
+    assert_equal %w[lib/stub_ef.rb ext/stub_ef/extconf.rb], stub.files
+    assert stub.stubbed?
+  end
+
+  def test_files_stub_missing
+    stub = stub_without_extension
+
+    assert_equal Gem::StubSpecification::StubLine::NO_FILES, stub.files
+    assert stub.stubbed?
+  end
+
   def stub_with_version
     spec = File.join @gemhome, "specifications", "stub_v-with-version.gemspec"
     File.open spec, "w" do |io|
@@ -382,6 +410,54 @@ class TestStubSpecification < Gem::TestCase
           s.installed_by_version = '2.2'
         end
       STUB
+
+      io.flush
+
+      stub = Gem::StubSpecification.gemspec_stub io.path, @gemhome, File.join(@gemhome, "gems")
+
+      yield stub if block_given?
+
+      return stub
+    end
+  end
+
+  def stub_with_files
+    spec = File.join @gemhome, "specifications", "stub_f-2.gemspec"
+    File.open spec, "w" do |io|
+      io.write "# -*- encoding: utf-8 -*-\n"
+      io.write "# stub: stub_f 2 ruby lib\n"
+      io.write "# files: lib/stub_f.rb\0lib/stub_f/util.rb\n"
+      io.write "\n"
+      io.write "Gem::Specification.new do |s|\n"
+      io.write "  s.name = 'stub_f'\n"
+      io.write "  s.version = Gem::Version.new '2'\n"
+      io.write "  s.files = ['lib/stub_f.rb', 'lib/stub_f/util.rb']\n"
+      io.write "end\n"
+
+      io.flush
+
+      stub = Gem::StubSpecification.gemspec_stub io.path, @gemhome, File.join(@gemhome, "gems")
+
+      yield stub if block_given?
+
+      return stub
+    end
+  end
+
+  def stub_with_extension_and_files
+    spec = File.join @gemhome, "specifications", "stub_ef-2.gemspec"
+    File.open spec, "w" do |io|
+      io.write "# -*- encoding: utf-8 -*-\n"
+      io.write "# stub: stub_ef 2 ruby lib\n"
+      io.write "# stub: ext/stub_ef/extconf.rb\n"
+      io.write "# files: lib/stub_ef.rb\0ext/stub_ef/extconf.rb\n"
+      io.write "\n"
+      io.write "Gem::Specification.new do |s|\n"
+      io.write "  s.name = 'stub_ef'\n"
+      io.write "  s.version = Gem::Version.new '2'\n"
+      io.write "  s.extensions = ['ext/stub_ef/extconf.rb']\n"
+      io.write "  s.files = ['lib/stub_ef.rb', 'ext/stub_ef/extconf.rb']\n"
+      io.write "end\n"
 
       io.flush
 

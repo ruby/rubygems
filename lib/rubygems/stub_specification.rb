@@ -13,14 +13,19 @@ class Gem::StubSpecification < Gem::BasicSpecification
   TARGET_PREFIX = "# stub-target: "
 
   # :nodoc:
+  FILES_PREFIX = "# files: "
+
+  # :nodoc:
   OPEN_MODE = "r:UTF-8:-"
 
   class StubLine # :nodoc: all
     attr_reader :name, :version, :platform, :require_paths, :extensions,
                 :full_name, :content_address
+    attr_accessor :files
 
     NO_EXTENSIONS = [].freeze
     NO_TARGET = {}.freeze
+    NO_FILES = [].freeze
 
     # These are common require paths.
     REQUIRE_PATHS = { # :nodoc:
@@ -51,6 +56,7 @@ class Gem::StubSpecification < Gem::BasicSpecification
       @platform = Gem::Platform.new(target_platform || suffix)
       @content_address = suffix if Gem::ContentAddress.content_addressed_row?(suffix, target_platform, validate_ruby_abi: false)
       @extensions    = extensions
+      @files         = NO_FILES
       @full_name     = if @content_address
         "#{name}-#{version}-#{content_address}"
       elsif platform == Gem::Platform::RUBY
@@ -136,10 +142,17 @@ class Gem::StubSpecification < Gem::BasicSpecification
                 key, value = pair.split("=", 2)
                 [key, value]
               end
+              line = file.readline
             end
 
             stubline.chomp! # readline(chomp: true) allocates 3x as much as .readline.chomp!
             @data = StubLine.new stubline, extensions, target
+
+            # Read files stub line if present
+            if line.start_with?(FILES_PREFIX)
+              line.chomp!
+              @data.files = line.byteslice(FILES_PREFIX.bytesize..).split("\0")
+            end
           end
         rescue EOFError
         end
@@ -155,6 +168,21 @@ class Gem::StubSpecification < Gem::BasicSpecification
 
   def raw_require_paths # :nodoc:
     data.require_paths
+  end
+
+  ##
+  # Files in the gem, from the files stub line if available,
+  # otherwise from the full specification.
+
+  def files
+    data.files
+  end
+
+  ##
+  # Activate this spec, loading the full specification if needed.
+
+  def activate
+    to_spec.activate
   end
 
   def missing_extensions?

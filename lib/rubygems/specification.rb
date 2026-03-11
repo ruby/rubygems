@@ -867,10 +867,18 @@ class Gem::Specification < Gem::BasicSpecification
   # Loads the default specifications. It should be called only once.
 
   def self.load_defaults
-    each_spec([Gem.default_specifications_dir]) do |spec|
-      # #load returns nil if the spec is bad, so we just ignore
-      # it at this stage
-      Gem.register_default_spec(spec)
+    default_dir = Gem.default_specifications_dir
+    base_dir = Gem.default_dir
+    gems_dir = File.join(base_dir, "gems")
+
+    each_gemspec([default_dir]) do |path|
+      stub = Gem::StubSpecification.default_gemspec_stub(path, base_dir, gems_dir)
+      if stub.stubbed? && !stub.files.equal?(Gem::StubSpecification::StubLine::NO_FILES)
+        Gem.register_default_spec(stub)
+      else
+        spec = load(path)
+        Gem.register_default_spec(spec) if spec
+      end
     end
   end
 
@@ -2420,6 +2428,10 @@ class Gem::Specification < Gem::BasicSpecification
     result << "#{Gem::StubSpecification::PREFIX}#{extensions.join "\0"}" unless
       extensions.empty?
     result << "#{Gem::StubSpecification::TARGET_PREFIX}platform=#{platform}" if content_addressed
+    unless files.empty?
+      files_line = "#{Gem::StubSpecification::FILES_PREFIX}#{files.join "\0"}"
+      result << files_line if files_line.bytesize <= 200
+    end
     result << nil
     result << "Gem::Specification.new do |s|"
 
