@@ -873,7 +873,7 @@ class Gem::Specification < Gem::BasicSpecification
 
     each_gemspec([default_dir]) do |path|
       stub = Gem::StubSpecification.default_gemspec_stub(path, base_dir, gems_dir)
-      if stub.stubbed? && !stub.files.equal?(Gem::StubSpecification::StubLine::NO_FILES)
+      if stub.stubbed? && !stub.stubbed_files.equal?(Gem::StubSpecification::StubLine::NO_FILES)
         Gem.register_default_spec(stub)
       else
         spec = load(path)
@@ -2429,7 +2429,10 @@ class Gem::Specification < Gem::BasicSpecification
       extensions.empty?
     result << "#{Gem::StubSpecification::TARGET_PREFIX}platform=#{platform}" if content_addressed
     unless files.empty?
-      result << "#{Gem::StubSpecification::FILES_PREFIX}#{files.join "\0"}"
+      files_line = "#{Gem::StubSpecification::FILES_PREFIX}#{files.join "\0"}"
+      # A newline in a file path would split the stub line and corrupt parsing,
+      # so fall back to the eval path for such gems by omitting the line.
+      result << files_line unless files_line.include?("\n")
     end
     result << nil
     result << "Gem::Specification.new do |s|"

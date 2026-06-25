@@ -171,11 +171,21 @@ class Gem::StubSpecification < Gem::BasicSpecification
   end
 
   ##
+  # Files recorded in the files stub line, without loading the full
+  # specification. Returns StubLine::NO_FILES when the gemspec has no files
+  # stub line.
+
+  def stubbed_files
+    data.files
+  end
+
+  ##
   # Files in the gem, from the files stub line if available,
   # otherwise from the full specification.
 
   def files
-    data.files
+    stubbed = stubbed_files
+    stubbed.equal?(StubLine::NO_FILES) ? to_spec.files : stubbed
   end
 
   ##

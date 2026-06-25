@@ -297,7 +297,15 @@ class TestStubSpecification < Gem::TestCase
   def test_files_stub_missing
     stub = stub_without_extension
 
-    assert_equal Gem::StubSpecification::StubLine::NO_FILES, stub.files
+    assert_equal Gem::StubSpecification::StubLine::NO_FILES, stub.stubbed_files
+    assert stub.stubbed?
+  end
+
+  def test_files_falls_back_to_full_spec_without_files_stub
+    stub = stub_with_files_in_body
+
+    assert_equal Gem::StubSpecification::StubLine::NO_FILES, stub.stubbed_files
+    assert_equal %w[lib/stub_b.rb lib/stub_b/util.rb], stub.files
     assert stub.stubbed?
   end
 
@@ -432,6 +440,28 @@ class TestStubSpecification < Gem::TestCase
       io.write "  s.name = 'stub_f'\n"
       io.write "  s.version = Gem::Version.new '2'\n"
       io.write "  s.files = ['lib/stub_f.rb', 'lib/stub_f/util.rb']\n"
+      io.write "end\n"
+
+      io.flush
+
+      stub = Gem::StubSpecification.gemspec_stub io.path, @gemhome, File.join(@gemhome, "gems")
+
+      yield stub if block_given?
+
+      return stub
+    end
+  end
+
+  def stub_with_files_in_body
+    spec = File.join @gemhome, "specifications", "stub_b-2.gemspec"
+    File.open spec, "w" do |io|
+      io.write "# -*- encoding: utf-8 -*-\n"
+      io.write "# stub: stub_b 2 ruby lib\n"
+      io.write "\n"
+      io.write "Gem::Specification.new do |s|\n"
+      io.write "  s.name = 'stub_b'\n"
+      io.write "  s.version = Gem::Version.new '2'\n"
+      io.write "  s.files = ['lib/stub_b.rb', 'lib/stub_b/util.rb']\n"
       io.write "end\n"
 
       io.flush
