@@ -2429,8 +2429,7 @@ class Gem::Specification < Gem::BasicSpecification
       extensions.empty?
     result << "#{Gem::StubSpecification::TARGET_PREFIX}platform=#{platform}" if content_addressed
     unless files.empty?
-      files_line = "#{Gem::StubSpecification::FILES_PREFIX}#{files.join "\0"}"
-      result << files_line if files_line.bytesize <= 200
+      result << "#{Gem::StubSpecification::FILES_PREFIX}#{files.join "\0"}"
     end
     result << nil
     result << "Gem::Specification.new do |s|"
