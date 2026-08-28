@@ -710,6 +710,7 @@ end
   end
 
   def test_self__load_future
+    pend_for_ruby_box_marshal
     spec = Gem::Specification.new
     spec.name = "a"
     spec.version = "1"
@@ -1064,6 +1065,7 @@ dependencies: []
   end
 
   def test_handles_private_null_type
+    pend_for_ruby_box_marshal
     yaml_defined = Object.const_defined?("YAML")
 
     path = File.expand_path "data/pry-0.4.7.gemspec.rz", __dir__
@@ -1076,6 +1078,7 @@ dependencies: []
   end
 
   def test_handles_dependencies_with_syck_requirements_bug
+    pend_for_ruby_box_marshal
     yaml_defined = Object.const_defined?("YAML")
 
     path = File.expand_path "data/excon-0.7.7.gemspec.rz", __dir__
@@ -1281,6 +1284,7 @@ dependencies: []
   end
 
   def test__dump
+    pend_for_ruby_box_marshal
     @a2.platform = Gem::Platform.local
     @a2.instance_variable_set :@original_platform, "old_platform"
 
@@ -3794,6 +3798,7 @@ Did you mean 'Ruby'?
   end
 
   def test__load_fixes_Date_objects
+    pend_for_ruby_box_marshal
     spec = util_spec "a", 1
     spec.instance_variable_set :@date, Date.today
 

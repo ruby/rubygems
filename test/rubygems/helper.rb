@@ -1388,6 +1388,14 @@ Also, a list:
     pend "Ruby::Box breaks $stdout/$stderr capture (https://bugs.ruby-lang.org/issues/21867)" if ruby_box_enabled?
   end
 
+  ##
+  # Under Ruby::Box, Marshal in the main box cannot resolve Gem:: (and other
+  # boxed) constants. Pends until the ruby-core fix for
+  # https://bugs.ruby-lang.org/issues/22090 lands.
+
+  def pend_for_ruby_box_marshal
+    pend "Marshal cannot resolve boxed constants under Ruby::Box (https://bugs.ruby-lang.org/issues/22090)" if ruby_box_enabled?
+  end
 
   ##
   # Returns the make command for the current platform. For versions of Ruby
