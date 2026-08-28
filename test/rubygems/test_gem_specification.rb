@@ -1575,6 +1575,7 @@ dependencies: []
   end
 
   def test_contains_requirable_file_eh_extension
+    pend_for_ruby_box_stdio_capture
     ext_spec
 
     _, err = capture_output do
@@ -3180,6 +3181,7 @@ duplicate dependency on c (>= 1.2.3, development), (~> 1.2) use:
   end
 
   def test_unresolved_specs
+    pend_for_ruby_box_stdio_capture
     specification = Gem::Specification.clone
 
     set_orig specification
@@ -3206,6 +3208,7 @@ Please report a bug if this causes problems.
   end
 
   def test_unresolved_specs_with_versions
+    pend_for_ruby_box_stdio_capture
     specification = Gem::Specification.clone
 
     set_orig specification
@@ -3238,6 +3241,7 @@ Please report a bug if this causes problems.
   end
 
   def test_unresolved_specs_with_duplicated_versions
+    pend_for_ruby_box_stdio_capture
     specification = Gem::Specification.clone
 
     set_orig specification
@@ -3291,6 +3295,7 @@ Please report a bug if this causes problems.
   end
 
   def test_duplicate_runtime_dependency
+    pend_for_ruby_box_stdio_capture
     expected = "WARNING: duplicated b dependency [\"~> 3.0\", \"~> 3.0\"]\n"
     out, err = capture_output do
       @a1.add_dependency "b", "~> 3.0", "~> 3.0"

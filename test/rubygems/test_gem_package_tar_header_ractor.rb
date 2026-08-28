@@ -8,6 +8,11 @@ unless Gem::Package::TarTestCase.method_defined?(:assert_ractor)
 end
 
 class TestGemPackageTarHeaderRactor < Gem::Package::TarTestCase
+  def setup
+    super
+    pend "Ruby::Box ignores $VERBOSE=, so assert_ractor cannot keep the Ractor experimental warning out of the child stderr (ruby-core bug, same family as https://bugs.ruby-lang.org/issues/21867)" if ruby_box_enabled?
+  end
+
   SETUP = <<~RUBY
     header = {
       name: "x",
