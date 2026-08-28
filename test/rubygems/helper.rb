@@ -397,6 +397,10 @@ class Gem::TestCase < Test::Unit::TestCase
     ENV["BUNDLE_USER_HOME"] = nil
     ENV["RUBYGEMS_PREVENT_UPDATE_SUGGESTION"] = "true"
 
+    # Child ruby processes inherit RUBY_BOX and print an experimental
+    # warning on startup, breaking assertions on subprocess stderr.
+    ENV["RUBYOPT"] = [ENV["RUBYOPT"], "-W:no-experimental"].compact.join(" ") if ruby_box_enabled?
+
     @current_dir = Dir.pwd
     @fetcher     = nil
 
@@ -1365,6 +1369,13 @@ Also, a list:
 
   def ruby_repo?
     !ENV["GEM_COMMAND"].nil?
+  end
+
+  ##
+  # Is this test running under Ruby::Box (RUBY_BOX=1)?
+
+  def ruby_box_enabled?
+    defined?(Ruby::Box) && Ruby::Box.enabled?
   end
 
   ##
