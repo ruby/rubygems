@@ -61,7 +61,7 @@ jobs:
             os: { name: Windows, value: windows-2025 }
             symlink: off
 
-          - ruby: { name: "head (RUBY_BOX=1)", value: head }
+          - ruby: { name: head (RUBY_BOX=1), value: head }
             os: { name: Ubuntu, value: ubuntu-24.04 }
             ruby_box: true
     env:
