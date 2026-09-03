@@ -367,10 +367,11 @@ module Gem::Security
   ML_DSA_65_NAME = "ML-DSA-65"
   ML_DSA_87_NAME = "ML-DSA-87"
 
-  # ML-DSA SubjectPublicKeyInfo algorithm OIDs (NIST FIPS 204). Matching the OID
-  # rather than the algorithm name keeps this working on SSL libraries that
-  # spell the name differently: AWS-LC registers 2.16.840.1.101.3.4.3.18 as
-  # "MLDSA65", not "ML-DSA-65".
+  # ML-DSA SubjectPublicKeyInfo algorithm OIDs (RFC 9881 Sections 2 and 4).
+  # https://www.rfc-editor.org/rfc/rfc9881.html
+  # Matching the OID rather than the algorithm name keeps this working on SSL
+  # libraries that spell the name differently: AWS-LC registers
+  # 2.16.840.1.101.3.4.3.18 as "MLDSA65", not "ML-DSA-65".
 
   ML_DSA_OIDS = %w[
     2.16.840.1.101.3.4.3.17
