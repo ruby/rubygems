@@ -1126,6 +1126,7 @@ class TestGemDependencyInstaller < Gem::TestCase
   end
 
   def test_install_legacy_spec_with_nil_required_ruby_version
+    pend_for_ruby_box_marshal
     path = File.expand_path "data/null-required-ruby-version.gemspec.rz", __dir__
     spec = Marshal.load Gem.read_binary(path)
     def spec.validate(*args); end
@@ -1151,6 +1152,7 @@ class TestGemDependencyInstaller < Gem::TestCase
   end
 
   def test_install_legacy_spec_with_nil_required_rubygems_version
+    pend_for_ruby_box_marshal
     path = File.expand_path "data/null-required-rubygems-version.gemspec.rz", __dir__
     spec = Marshal.load Gem.read_binary(path)
     def spec.validate(*args); end

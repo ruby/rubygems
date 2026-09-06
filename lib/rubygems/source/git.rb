@@ -188,9 +188,10 @@ class Gem::Source::Git < Gem::Source
       hash = Gem::Util.popen(git_command, "rev-parse", @reference).strip
     end
 
+    # Process.last_status instead of $?, which Ruby::Box leaves uninitialized
     raise Gem::Exception,
           "unable to find reference #{@reference} in #{@repository}" unless
-            $?.success?
+            Process.last_status.success?
 
     hash
   end
