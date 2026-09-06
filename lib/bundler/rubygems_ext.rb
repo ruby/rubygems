@@ -269,6 +269,19 @@ module Gem
       full_require_paths
     end
 
+    alias_method :rg_full_require_paths, :full_require_paths
+    def full_require_paths
+      @bundler_full_require_paths ||= begin # rubocop:disable Naming/MemoizedInstanceVariableName
+        paths = rg_full_require_paths
+
+        if source.respond_to?(:path?) && source.path? && paths.include?(extension_dir)
+          [extension_dir] + (paths - [extension_dir])
+        else
+          paths
+        end
+      end
+    end
+
     alias_method :rg_extension_dir, :extension_dir
     def extension_dir
       # following instance variable is already used in original method

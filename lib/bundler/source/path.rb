@@ -75,9 +75,10 @@ module Bundler
 
       def install(spec, options = {})
         using_message = "Using #{version_message(spec, options[:previous_spec])} from #{self}"
+        using_message += " with native extensions" if build_extensions?(spec)
         using_message += " and installing its executables" unless spec.executables.empty?
         print_using_message using_message
-        generate_bin(spec, disable_extensions: true)
+        generate_bin(spec, disable_extensions: !extensions_missing_for_build?(spec), build_args: options[:build_args])
         nil # no post-install message
       end
 
@@ -117,6 +118,16 @@ module Bundler
 
       def expanded_original_path
         @expanded_original_path ||= expand(original_path)
+      end
+
+      def extension_dir_for(spec)
+        return unless build_extensions?(spec)
+
+        @extension_dirs ||= {}
+        @extension_dirs[spec.full_name] ||= Bundler.install_path.join(
+          "extensions", Gem::Platform.local.to_s, Gem.extension_api_version,
+          "#{spec.full_name}-#{extension_digest(spec)}"
+        ).to_s
       end
 
       private
@@ -172,6 +183,10 @@ module Bundler
             # consider that for activation and never makes sense to ignore it.
             spec.ignored = false
 
+            if extension_dir = extension_dir_for(spec)
+              spec.extension_dir = extension_dir
+            end
+
             # Validation causes extension_dir to be calculated, which depends
             # on #source, so we validate here instead of load_gemspec
             validate_spec(spec)
@@ -207,6 +222,61 @@ module Bundler
         index
       end
 
+      def build_extensions?(spec)
+        return false unless path?
+        return false if spec.extensions.empty?
+
+        per_gem = Bundler.settings["build_path_extensions.#{spec.name}"]
+        return per_gem unless per_gem.nil?
+
+        Bundler.settings[:build_path_extensions] || false
+      end
+
+      def missing_extensions?(spec)
+        return false unless extension_dir_for(spec)
+
+        spec.missing_extensions?
+      end
+
+      def extensions_missing_for_build?(spec)
+        return false unless build_extensions?(spec)
+
+        !File.exist?(spec.gem_build_complete_path)
+      end
+
+      def extension_digest(spec)
+        gem_dir = spec.full_gem_path
+        digest = SharedHelpers.digest(:SHA256).new
+        digest << Bundler.settings["build.#{spec.name}"].to_s
+
+        extension_source_files(spec).each do |file|
+          digest << file.delete_prefix("#{gem_dir}/") << "\0"
+          stat = File.stat(file)
+          digest << "#{stat.size}-#{stat.mtime.to_i}-#{stat.mtime.nsec}" << "\0"
+        end
+
+        digest.hexdigest[0, 12]
+      end
+
+      def extension_source_files(spec)
+        files = spec.extensions.flat_map do |extension|
+          dir = File.dirname(extension)
+          base = dir == "." ? spec.full_gem_path : File.join(spec.full_gem_path, dir)
+          Gem::Util.glob_files_in_dir("**/*", base)
+        end
+
+        files << spec.loaded_from.to_s
+        files.uniq.select {|file| File.file?(file) }.sort
+      end
+
+      def extension_build_dir(spec)
+        return unless extension_dir_for(spec)
+
+        Bundler.bundle_path.join(
+          "cache", "bundler", "path_extensions", File.basename(extension_dir_for(spec))
+        ).to_s
+      end
+
       def relative_path(path = self.path)
         if path.to_s.start_with?(root_path.to_s)
           return path.relative_path_from(root_path)
@@ -235,7 +305,8 @@ module Bundler
           env_shebang: false,
           disable_extensions: options[:disable_extensions],
           build_args: options[:build_args],
-          bundler_extension_cache_path: extension_cache_path(spec)
+          bundler_extension_cache_path: extension_cache_path(spec),
+          extension_build_dir: extension_build_dir(spec)
         )
         installer.post_install
       rescue Gem::InvalidSpecificationException => e
