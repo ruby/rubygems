@@ -2,6 +2,8 @@
 
 require_relative "../command"
 require_relative "../local_remote_options"
+require_relative "../remote_fetcher"
+require_relative "../resolver"
 require_relative "../version_option"
 
 class Gem::Commands::FetchCommand < Gem::Command
@@ -79,31 +81,59 @@ then repackaging it.
     platform  = Gem.platforms.last
     gem_names = get_all_gem_names_and_versions
 
+    # A BestSet reads a source's compact index when it serves one, the same way
+    # gems are looked up when installing them.
+    remote_set = Gem::Resolver::BestSet.new
+
     gem_names.each do |gem_name, gem_version|
       gem_version ||= version
       dep = Gem::Dependency.new gem_name, gem_version
       dep.prerelease = options[:prerelease]
       suppress_suggestions = !options[:suggest_alternate]
 
-      specs_and_sources, errors =
-        Gem::SpecFetcher.fetcher.spec_for_dependency dep
+      remote_specs, errors = find_remote_specs dep, remote_set
 
       if platform
-        filtered = specs_and_sources.select {|s,| s.platform == platform }
-        specs_and_sources = filtered unless filtered.empty?
+        filtered = remote_specs.select {|s| s.platform == platform }
+        remote_specs = filtered unless filtered.empty?
       end
 
-      spec, source = specs_and_sources.max_by {|s,| s }
+      remote_spec = remote_specs.max_by {|s| [s.version, Gem::Platform.sort_priority(s.platform)] }
 
-      if spec.nil?
+      if remote_spec.nil?
         show_lookup_failure gem_name, gem_version, errors, suppress_suggestions, options[:domain]
         exit_code |= 2
         next
       end
-      source.download spec
+
+      spec = remote_spec.spec
+      remote_spec.source.download spec
       say "Downloaded #{spec.full_name}"
     end
 
     exit_code
+  end
+
+  # Find specs in +set+ that match +dep+ and can be used on this platform,
+  # along with the reasons any other spec was rejected.
+
+  def find_remote_specs(dep, set)
+    set.prerelease = dep.prerelease?
+
+    request = Gem::Resolver::DependencyRequest.new dep, nil
+
+    matching, mismatched = set.find_all(request).partition do |spec|
+      Gem::Platform.match_spec? spec
+    end
+
+    [matching, set.errors + platform_mismatches(mismatched)]
+  end
+
+  def platform_mismatches(specs)
+    specs.group_by {|spec| [spec.name, spec.version] }.map do |(name, version), group|
+      mismatch = Gem::PlatformMismatch.new name, version
+      group.each {|spec| mismatch.add_platform spec.platform.to_s }
+      mismatch
+    end
   end
 end
