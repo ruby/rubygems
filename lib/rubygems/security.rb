@@ -367,8 +367,18 @@ module Gem::Security
   ML_DSA_65_NAME = "ML-DSA-65"
   ML_DSA_87_NAME = "ML-DSA-87"
 
-  ML_DSA_NAMES = [ML_DSA_44_NAME, ML_DSA_65_NAME, ML_DSA_87_NAME].freeze
-  private_constant :ML_DSA_NAMES
+  # ML-DSA SubjectPublicKeyInfo algorithm OIDs (RFC 9881 Sections 2 and 4).
+  # https://www.rfc-editor.org/rfc/rfc9881.html
+  # Matching the OID rather than the algorithm name keeps this working on SSL
+  # libraries that spell the name differently: AWS-LC registers
+  # 2.16.840.1.101.3.4.3.18 as "MLDSA65", not "ML-DSA-65".
+
+  ML_DSA_OIDS = %w[
+    2.16.840.1.101.3.4.3.17
+    2.16.840.1.101.3.4.3.18
+    2.16.840.1.101.3.4.3.19
+  ].freeze
+  private_constant :ML_DSA_OIDS
 
   ##
   # Cipher used to encrypt the key pair used to sign gems.
@@ -527,7 +537,7 @@ module Gem::Security
 
   def self.ml_dsa_key?(key)
     algorithm = OpenSSL::ASN1.decode(key.public_to_der).value.first.value.first
-    ML_DSA_NAMES.include?(algorithm.ln)
+    ML_DSA_OIDS.include?(algorithm.oid)
   rescue OpenSSL::ASN1::ASN1Error, OpenSSL::PKey::PKeyError, NoMethodError
     false
   end
