@@ -233,6 +233,69 @@ RSpec.describe Bundler::LockfileParser do
       include_examples "parsing"
     end
 
+    context "when a GEM source has override remotes" do
+      let(:lockfile_contents) { <<~L }
+        GEM
+          remote: https://rubygems.org/
+          override: https://build-farm.example.com/
+          specs:
+            rake (10.3.2)
+
+        PLATFORMS
+          ruby
+
+        DEPENDENCIES
+          rake
+
+        CHECKSUMS
+          rake (10.3.2) sha256=814828c34f1315d7e7b7e8295184577cc4e969bad6156ac069d02d63f58d82e8
+
+        BUNDLED WITH
+           1.12.0.rc.2
+      L
+
+      before { allow(Bundler::SharedHelpers).to receive(:find_gemfile).and_return(bundled_app("gems.rb")) }
+      subject { described_class.new(lockfile_contents) }
+
+      it "parses the override remote" do
+        gem_source = subject.sources.find {|source| source.is_a?(Bundler::Source::Rubygems) }
+        expect(gem_source.override_remotes).to eq [Gem::URI("https://build-farm.example.com/")]
+      end
+
+      it "preserves the primary remote" do
+        gem_source = subject.sources.find {|source| source.is_a?(Bundler::Source::Rubygems) }
+        expect(gem_source.remotes.map(&:to_s)).to include("https://rubygems.org/")
+      end
+    end
+
+    context "when a GEM source has multiple override remotes" do
+      let(:lockfile_contents) { <<~L }
+        GEM
+          remote: https://rubygems.org/
+          override: https://first.example.com/
+          override: https://second.example.com/
+          specs:
+            rake (10.3.2)
+
+        PLATFORMS
+          ruby
+
+        DEPENDENCIES
+          rake
+
+        BUNDLED WITH
+           1.12.0.rc.2
+      L
+
+      before { allow(Bundler::SharedHelpers).to receive(:find_gemfile).and_return(bundled_app("gems.rb")) }
+      subject { described_class.new(lockfile_contents) }
+
+      it "parses multiple override remotes" do
+        gem_source = subject.sources.find {|source| source.is_a?(Bundler::Source::Rubygems) }
+        expect(gem_source.override_remotes.size).to eq 2
+      end
+    end
+
     context "when the checksum is urlsafe base64 encoded" do
       let(:lockfile_contents) do
         super().sub(
