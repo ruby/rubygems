@@ -432,7 +432,7 @@ class Release
   end
 
   def pull_requests_merged_into(base, from, to)
-    commits = `git rev-list #{from}..#{to}`
+    commits = `git rev-list #{from}..#{to} 2>/dev/null`
     raise "Failed to list the commits in #{from}..#{to}" unless $?.success?
 
     reachable = Set.new(commits.split("\n"))
@@ -442,7 +442,7 @@ class Release
 
   # The date bound is deliberately loose. It bounds the query, not the result.
   def merged_pull_requests(base, since_ref)
-    committed_at = `git log -1 --format=%cI #{since_ref}`.strip
+    committed_at = `git log -1 --format=%cI #{since_ref} 2>/dev/null`.strip
     raise "Failed to resolve #{since_ref}" unless $?.success?
 
     since = (Time.iso8601(committed_at) - 86_400).utc.strftime("%Y-%m-%d")

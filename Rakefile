@@ -105,7 +105,7 @@ task "coverage:report" do
     next
   end
 
-  $stdout = File.open(File::NULL, "w")
+  $stderr = File.open(File::NULL, "w")
   SimpleCov.collate Dir[resultset] do
     coverage_dir "coverage"
     skip "/test/"
@@ -124,7 +124,7 @@ task "coverage:report" do
     end
   end
 ensure
-  $stdout = STDOUT
+  $stderr = STDERR
 end
 
 spec = Gem::Specification.load(File.expand_path("rubygems-update.gemspec", __dir__))
