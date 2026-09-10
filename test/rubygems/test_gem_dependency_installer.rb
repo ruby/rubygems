@@ -63,6 +63,50 @@ class TestGemDependencyInstaller < Gem::TestCase
     assert_equal [@a1], inst.installed_gems
   end
 
+  def test_install_with_explicit_source_falls_back_for_dependencies
+    spec_fetcher do |fetcher|
+      fetcher.download "b", 1
+    end
+
+    spec_fetcher "http://other.example/" do |fetcher|
+      fetcher.download "a", 1 do |s|
+        s.add_dependency "b", ">= 0"
+      end
+    end
+
+    Gem.sources << "http://other.example/"
+
+    inst = Gem::DependencyInstaller.new sources: ["http://other.example/"]
+    inst.install "a"
+
+    # 'a' is installed from the explicitly requested source, while its
+    # dependency 'b' (only available on the default source) still resolves via
+    # the regular fallback.
+    assert_equal %w[a-1 b-1], inst.installed_gems.map(&:full_name).sort
+  end
+
+  def test_install_with_explicit_source_does_not_fall_back_for_named_gem
+    spec_fetcher do |fetcher|
+      fetcher.download "a", 1
+    end
+
+    spec_fetcher "http://other.example/" do |fetcher|
+      fetcher.download "b", 1
+    end
+
+    Gem.sources << "http://other.example/"
+
+    inst = Gem::DependencyInstaller.new sources: ["http://other.example/"]
+
+    # 'a' only exists on the default source, so installing it from the explicit
+    # source must fail rather than silently using the default source.
+    assert_raise Gem::UnsatisfiableDependencyError do
+      inst.install "a"
+    end
+
+    assert_equal [], inst.installed_gems
+  end
+
   def test_install_prerelease
     util_setup_gems
 
