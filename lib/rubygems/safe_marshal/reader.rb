@@ -29,10 +29,14 @@ module Gem
       class LengthTooLongError < Error
       end
 
+      class TooDeeplyNestedError < Error
+      end
+
       def initialize(io)
         @io = io
         @object_links = {}
         @symbol_links = {}
+        @depth = 0
       end
 
       def read!
@@ -46,6 +50,9 @@ module Gem
 
       MARSHAL_VERSION = [Marshal::MAJOR_VERSION, Marshal::MINOR_VERSION].map(&:chr).join.freeze
       private_constant :MARSHAL_VERSION
+
+      MAX_NESTING_DEPTH = 1_000
+      private_constant :MAX_NESTING_DEPTH
 
       def read_header
         v = @io.read(2)
@@ -109,6 +116,9 @@ module Gem
       end
 
       def read_element
+        @depth += 1
+        raise TooDeeplyNestedError, "exceeded maximum nesting depth (#{MAX_NESTING_DEPTH})" if @depth > MAX_NESTING_DEPTH
+
         type = read_byte
         case type
         when 34 then read_string # ?"
@@ -139,6 +149,8 @@ module Gem
         else
           raise Error, "Unknown marshal type discriminator #{type.chr.inspect} (#{type})"
         end
+      ensure
+        @depth -= 1
       end
 
       STRING_E_SYMBOL = Elements::Symbol.new("E").freeze
