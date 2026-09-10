@@ -442,7 +442,7 @@ class Release
       ids = batch.flat_map {|pull| ["-F", "ids[]=#{pull.node_id}"] }
 
       json = IO.popen(["gh", "api", "graphql", "-f", "query=#{COMMIT_AUTHORS_QUERY}", *ids], &:read)
-      raise "Failed to list the commits of #{batch.map(&:number).join(", ")}" unless $?.success?
+      raise "Failed to list the commits of #{batch.map(&:number).join(", ")}" unless Process.last_status.success?
 
       credit_commit_authors(batch, JSON.parse(json).dig("data", "nodes"))
     end
@@ -501,7 +501,7 @@ class Release
 
   def pull_requests_merged_into(base, from, to)
     commits = git_quietly("rev-list", "#{from}..#{to}")
-    raise "Failed to list the commits in #{from}..#{to}" unless $?.success?
+    raise "Failed to list the commits in #{from}..#{to}" unless Process.last_status.success?
 
     reachable = Set.new(commits.split("\n"))
 
@@ -511,12 +511,12 @@ class Release
   # The date bound is deliberately loose. It bounds the query, not the result.
   def merged_pull_requests(base, since_ref)
     committed_at = git_quietly("log", "-1", "--format=%cI", since_ref).strip
-    raise "Failed to resolve #{since_ref}" unless $?.success?
+    raise "Failed to resolve #{since_ref}" unless Process.last_status.success?
 
     since = (Time.iso8601(committed_at) - 86_400).utc.strftime("%Y-%m-%d")
 
     json = `gh pr list --repo ruby/rubygems --state merged --base #{base} --search 'merged:>=#{since}' --limit #{MERGED_PULL_REQUEST_LIMIT} --json number,id,title,labels,mergeCommit,mergedAt,author,url`
-    raise "Failed to list pull requests merged into #{base} since #{since}" unless $?.success?
+    raise "Failed to list pull requests merged into #{base} since #{since}" unless Process.last_status.success?
 
     pull_requests_from(json, "#{base} since #{since}")
   end

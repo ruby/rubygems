@@ -137,6 +137,7 @@ class TestGemCommandsSpecificationCommand < Gem::TestCase
   end
 
   def test_execute_marshal
+    pend_for_ruby_box_marshal
     foo = util_spec "foo", "2"
 
     install_specs foo

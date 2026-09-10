@@ -710,6 +710,7 @@ end
   end
 
   def test_self__load_future
+    pend_for_ruby_box_marshal
     spec = Gem::Specification.new
     spec.name = "a"
     spec.version = "1"
@@ -1064,6 +1065,7 @@ dependencies: []
   end
 
   def test_handles_private_null_type
+    pend_for_ruby_box_marshal
     yaml_defined = Object.const_defined?("YAML")
 
     path = File.expand_path "data/pry-0.4.7.gemspec.rz", __dir__
@@ -1076,6 +1078,7 @@ dependencies: []
   end
 
   def test_handles_dependencies_with_syck_requirements_bug
+    pend_for_ruby_box_marshal
     yaml_defined = Object.const_defined?("YAML")
 
     path = File.expand_path "data/excon-0.7.7.gemspec.rz", __dir__
@@ -1281,6 +1284,7 @@ dependencies: []
   end
 
   def test__dump
+    pend_for_ruby_box_marshal
     @a2.platform = Gem::Platform.local
     @a2.instance_variable_set :@original_platform, "old_platform"
 
@@ -1576,6 +1580,7 @@ dependencies: []
   end
 
   def test_contains_requirable_file_eh_extension
+    pend_for_ruby_box_stdio_capture
     ext_spec
 
     _, err = capture_output do
@@ -3386,6 +3391,7 @@ duplicate dependency on c (>= 1.2.3, development), (~> 1.2) use:
   end
 
   def test_unresolved_specs
+    pend_for_ruby_box_stdio_capture
     specification = Gem::Specification.clone
 
     set_orig specification
@@ -3412,6 +3418,7 @@ Please report a bug if this causes problems.
   end
 
   def test_unresolved_specs_with_versions
+    pend_for_ruby_box_stdio_capture
     specification = Gem::Specification.clone
 
     set_orig specification
@@ -3444,6 +3451,7 @@ Please report a bug if this causes problems.
   end
 
   def test_unresolved_specs_with_duplicated_versions
+    pend_for_ruby_box_stdio_capture
     specification = Gem::Specification.clone
 
     set_orig specification
@@ -3497,6 +3505,7 @@ Please report a bug if this causes problems.
   end
 
   def test_duplicate_runtime_dependency
+    pend_for_ruby_box_stdio_capture
     expected = "WARNING: duplicated b dependency [\"~> 3.0\", \"~> 3.0\"]\n"
     out, err = capture_output do
       @a1.add_dependency "b", "~> 3.0", "~> 3.0"
@@ -3995,6 +4004,7 @@ Did you mean 'Ruby'?
   end
 
   def test__load_fixes_Date_objects
+    pend_for_ruby_box_marshal
     spec = util_spec "a", 1
     spec.instance_variable_set :@date, Date.today
 

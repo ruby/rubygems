@@ -317,10 +317,12 @@ class TestGemSafeMarshal < Gem::TestCase
   end
 
   def test_frozen_object
+    pend_for_ruby_box_marshal
     assert_safe_load_as Gem::Version.new("1.abc").freeze
   end
 
   def test_date
+    pend_for_ruby_box_marshal
     assert_safe_load_as Date.new(1994, 12, 9)
   end
 
@@ -404,6 +406,7 @@ class TestGemSafeMarshal < Gem::TestCase
   end
 
   def test_gem_spec_unmarshall_required_ruby_rubygems_version
+    pend_for_ruby_box_marshal
     spec = Gem::Specification.new do |s|
       s.name = "hi"
       s.version = "1.2.3"
@@ -535,7 +538,12 @@ class TestGemSafeMarshal < Gem::TestCase
 
   def assert_safe_load_marshal(dumped, additional_methods: [], permitted_ivars: nil, equality: true, marshal_dump_equality: true,
     inspect: true, to_s: true)
-    loaded = Marshal.load(dumped)
+    loaded = begin
+      Marshal.load(dumped)
+    rescue ArgumentError => e
+      pend_for_ruby_box_marshal if e.message.include?("undefined class/module")
+      raise
+    end
     safe_loaded =
       assert_nothing_raised("dumped: #{dumped.b.inspect} loaded: #{loaded.inspect}") do
         if permitted_ivars

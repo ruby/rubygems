@@ -431,6 +431,7 @@ class TestGemRequirement < Gem::TestCase
   end
 
   def test_marshal_load_attack
+    pend_for_ruby_box_marshal
     wa = Gem::Net::WriteAdapter.allocate
     wa.instance_variable_set(:@socket, self.class)
     wa.instance_variable_set(:@method_id, :exploit)

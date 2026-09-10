@@ -60,6 +60,10 @@ jobs:
           - ruby: { name: no symlinks, value: 4.0.5 }
             os: { name: Windows, value: windows-2025 }
             symlink: off
+
+          - ruby: { name: head (RUBY_BOX=1), value: head }
+            os: { name: Ubuntu, value: ubuntu-24.04 }
+            ruby_box: true
     env:
       RUBYGEMS_USE_PSYCH: ${{ matrix.use_psych || 'false' }}
 
@@ -79,7 +83,10 @@ jobs:
         run: bin/rake setup
       - name: Run Test
         run: bin/rake test
-        if: matrix.ruby.name != 'truffleruby' && matrix.ruby.name != 'jruby' && matrix.symlink != 'off'
+        if: matrix.ruby.name != 'truffleruby' && matrix.ruby.name != 'jruby' && matrix.symlink != 'off' && !matrix.ruby_box
+      - name: Run Test (RUBY_BOX=1)
+        run: RUBY_BOX=1 bin/rake test
+        if: matrix.ruby_box
       - name: Run Test isolatedly
         run: bin/rake test:isolated
         if: matrix.ruby.name == '3.4' && matrix.os.name != 'Windows'
