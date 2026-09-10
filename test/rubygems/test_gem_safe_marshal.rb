@@ -478,6 +478,35 @@ class TestGemSafeMarshal < Gem::TestCase
     assert_equal e.message, "expected 1 bytes, got EOF"
   end
 
+  def test_nesting_depth_is_capped
+    # 2 bytes per level on the wire, so this is a small payload
+    payload = "\x04\x08".b + ("[\x06".b * 2_400) + "0".b
+
+    e = assert_raise(Gem::SafeMarshal::Reader::TooDeeplyNestedError) do
+      Gem::SafeMarshal.safe_load(payload)
+    end
+    assert_equal "exceeded maximum nesting depth (1000)", e.message
+
+    # the cap raises a StandardError, so callers that already rescue
+    # StandardError around safe_load keep working
+    assert_kind_of StandardError, e
+  end
+
+  def test_nesting_below_the_cap_still_parses
+    payload = "\x04\x08".b + ("[\x06".b * 998) + "0".b
+    # deliberately not asserting on the value itself: inspecting a 998-deep
+    # array is what blows the stack, not parsing it
+    assert_equal ::Array, Gem::SafeMarshal.safe_load(payload).class
+  end
+
+  def test_repeated_siblings_do_not_count_as_depth
+    # 5_000 elements, all at depth 2 -- must not trip the cap
+    payload = "\x04\x08[".b + "\x02\x88\x13".b + ("0".b * 5_000)
+    parsed = Gem::SafeMarshal.safe_load(payload)
+    assert_equal ::Array, parsed.class
+    assert_equal 5_000, parsed.size
+  end
+
   def test_negative_length
     assert_raise(Gem::SafeMarshal::Reader::NegativeLengthError) do
       Gem::SafeMarshal.safe_load("\004\010}\325")
