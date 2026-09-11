@@ -477,10 +477,19 @@ class Gem::Resolver
     @all_specs[name].group_by(&:version).transform_values do |candidates|
       next candidates.first if candidates.length == 1
 
-      # Prefer already-installed specs to avoid unnecessary downloads
+      # Prefer already-installed specs to avoid unnecessary downloads.
       installed = candidates.select {|s| s.is_a?(Gem::Resolver::InstalledSpecification) }
-      next installed.first if installed.length == 1
-      candidates = installed if installed.any?
+
+      superseded_installed = installed.select do |installed_spec|
+        candidates.any? {|candidate| widened_remote_spec_supersedes?(candidate, installed_spec) }
+      end
+
+      if superseded_installed.any?
+        candidates -= superseded_installed
+      else
+        next installed.first if installed.length == 1
+        candidates = installed if installed.any?
+      end
 
       # Among remaining candidates, prefer a content-addressed candidate
       # built for the running Ruby, then the most specific platform, then the
@@ -494,6 +503,22 @@ class Gem::Resolver
          source_rank[s.source]]
       end
     end
+  end
+
+  def widened_remote_spec_supersedes?(candidate, installed_spec)
+    return false if candidate.is_a?(Gem::Resolver::InstalledSpecification)
+
+    candidate_address = candidate.content_address
+    installed_address = installed_spec.content_address
+
+    return false unless Gem::ContentAddress.match?(candidate_address)
+    return false unless installed_address&.length == Gem::ContentAddress::DEFAULT_LENGTH
+    return false unless candidate_address.length > installed_address.length
+
+    candidate.platform == installed_spec.platform &&
+      Gem::ContentAddress.ruby_abi_for(candidate.required_ruby_version) ==
+        Gem::ContentAddress.ruby_abi_for(installed_spec.required_ruby_version) &&
+      candidate_address.start_with?(installed_address)
   end
 
   def compute_dependencies(package, version)

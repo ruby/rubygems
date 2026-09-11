@@ -35,6 +35,13 @@ module Gem::ContentAddress
   end
 
   ##
+  # Whether +value+ is a valid content address longer than the default.
+
+  def self.widened?(value)
+    match?(value) && value.length > DEFAULT_LENGTH
+  end
+
+  ##
   # Whether +value+ is a well-formed Ruby ABI ("X.Y").
 
   def self.valid_ruby_abi?(value)

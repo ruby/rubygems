@@ -144,6 +144,7 @@ module Spec
         "spec/bundler/ci_detector_spec.rb",
       ],
       shard_d: [
+        "spec/bundler/match_platform_spec.rb",
         "spec/bundler/cli/exec_spec.rb",
         "spec/bundler/rubygems_ext_spec.rb",
         "spec/bundler/resolver/cooldown_spec.rb",

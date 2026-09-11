@@ -56,6 +56,50 @@ RSpec.describe "bundle install with content-addressable gems", :compact_index, r
     end
   end
 
+  it "prefers a widened server address over an installed short address" do
+    simulate_platform "x86_64-linux" do
+      build_repo2 do
+        build_gem "mygem", "1.0" do |s|
+          s.platform = Gem::Platform.new("x86_64-linux")
+          s.write "lib/mygem.rb", "MYGEM = '1.0 not_content_addressed'"
+        end
+      end
+
+      build_gem "mygem", "1.0", ruby_abi: current_abi, path: gem_repo2("gems") do |s|
+        s.platform = Gem::Platform.new("x86_64-linux")
+        s.required_ruby_version = "~> #{current_abi}.0"
+        s.write "lib/mygem.rb", "MYGEM = '1.0 content_addressed'"
+      end
+
+      install_gemfile <<~G, artifice: "compact_index_v2", env: { "BUNDLER_SPEC_GEM_REPO" => gem_repo2.to_s }
+        source "https://gem.repo2"
+
+        gem "mygem"
+      G
+
+      short_cache = Dir[default_bundle_path("cache", "mygem-1.0-*.gem").to_s].first
+      short_address = File.basename(short_cache, ".gem").rpartition("-").last
+      expect(short_address.length).to eq(Gem::ContentAddress::DEFAULT_LENGTH)
+
+      digest = Digest::SHA256.file(short_cache).hexdigest
+      widened_address = digest[0, 12]
+      short_repo_gem = gem_repo2("gems", "mygem-1.0-#{short_address}.gem")
+      widened_repo_gem = gem_repo2("gems", "mygem-1.0-#{widened_address}.gem")
+
+      update_repo2 do
+        FileUtils.mv short_repo_gem, widened_repo_gem
+      end
+
+      bundle "update mygem", artifice: "compact_index_v2", env: { "BUNDLER_SPEC_GEM_REPO" => gem_repo2.to_s }
+
+      expect(lockfile).to include("mygem (1.0-x86_64-linux) #{widened_address}")
+      expect(default_bundle_path("gems", "mygem-1.0-#{widened_address}")).to exist
+      expect(default_bundle_path("specifications", current_abi, "mygem-1.0-#{widened_address}.gemspec")).to exist
+      expect(default_bundle_path("cache", "mygem-1.0-#{widened_address}.gem")).to exist
+      expect(lockfile).not_to match(/mygem \(1\.0-x86_64-linux\) #{short_address}\s/)
+    end
+  end
+
   it "resolves a content-addressed binary from the local cache after a lockfile round-trip" do
     simulate_platform "x86_64-linux" do
       build_repo2 do
