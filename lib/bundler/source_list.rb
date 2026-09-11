@@ -65,7 +65,7 @@ module Bundler
       add_source_to_list Plugin.source(source).new(options), @plugin_sources
     end
 
-    def add_global_rubygems_remote(uri, cooldown: nil)
+    def add_global_rubygems_remote(uri, cooldown: nil, overrides: nil)
       unless cooldown.nil?
         new_source = source_class.new("remotes" => uri, "cooldown" => cooldown)
         [global_rubygems_source, *@rubygems_sources].find do |existing_source|
@@ -74,6 +74,7 @@ module Bundler
       end
 
       global_rubygems_source.add_remote(uri, cooldown: cooldown)
+      overrides&.each {|override| global_rubygems_source.add_override_remote(override) }
       global_rubygems_source
     end
 

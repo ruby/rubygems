@@ -135,6 +135,38 @@ RSpec.describe Bundler::SourceList do
         expect(returned_source.cooldown_for(Gem::URI("https://othersource.org/"))).to eq(7)
         expect(returned_source.cooldown_for(Gem::URI("https://rubygems.org/"))).to be_nil
       end
+
+      it "adds override remotes to the global source" do
+        source_list.add_global_rubygems_remote(
+          "https://rubygems.org",
+          overrides: ["https://build-farm.example.com"]
+        )
+        expect(returned_source.override_remotes).to eq [
+          Gem::URI("https://build-farm.example.com/"),
+        ]
+      end
+
+      it "adds multiple override remotes to the global source" do
+        source_list.add_global_rubygems_remote(
+          "https://rubygems.org",
+          overrides: ["https://first.example.com", "https://second.example.com"]
+        )
+        expect(returned_source.override_remotes.size).to eq 2
+      end
+
+      it "does not add override remotes when none are provided" do
+        expect(returned_source.override_remotes).to eq []
+      end
+    end
+
+    describe "#add_rubygems_source with overrides" do
+      it "passes override remotes to the new source" do
+        source = source_list.add_rubygems_source(
+          "remotes" => ["https://rubygems.org"],
+          "overrides" => ["https://build-farm.example.com"]
+        )
+        expect(source.override_remotes).to eq [Gem::URI("https://build-farm.example.com/")]
+      end
     end
 
     describe "#add_plugin_source" do

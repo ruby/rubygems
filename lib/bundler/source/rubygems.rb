@@ -12,11 +12,13 @@ module Bundler
       REQUIRE_MUTEX = Mutex.new
 
       attr_accessor :remotes, :remote_cooldowns
+      attr_reader :override_remotes
 
       def initialize(options = {})
         @options = options
         @remotes = []
         @remote_cooldowns = {}
+        @override_remotes = []
         @dependency_names = []
         @allow_remote = false
         @allow_cached = false
@@ -30,8 +32,12 @@ module Bundler
 
         cooldown = options["cooldown"]
         Array(options["remotes"]).reverse_each {|r| add_remote(r, cooldown: cooldown) }
+        Array(options["overrides"]).reverse_each {|override| add_override_remote(override) }
 
-        @lockfile_remotes = @remotes if options["from_lockfile"]
+        if options["from_lockfile"]
+          @lockfile_remotes = @remotes
+          @lockfile_override_remotes = @override_remotes
+        end
       end
 
       def caches
@@ -77,11 +83,13 @@ module Bundler
       end
 
       def hash
-        @remotes.hash
+        [@remotes, @override_remotes].hash
       end
 
       def eql?(other)
-        other.is_a?(Rubygems) && other.credless_remotes == credless_remotes
+        other.is_a?(Rubygems) &&
+          other.credless_remotes == credless_remotes &&
+          other.override_remotes == override_remotes
       end
 
       alias_method :==, :eql?
@@ -109,6 +117,7 @@ module Bundler
 
       def self.from_lock(options)
         options["remotes"] = Array(options.delete("remote")).reverse
+        options["overrides"] = Array(options.delete("override")).reverse
         new(options.merge("from_lockfile" => true))
       end
 
@@ -116,6 +125,9 @@ module Bundler
         out = String.new("GEM\n")
         lockfile_remotes.reverse_each do |remote|
           out << "  remote: #{remote}\n"
+        end
+        lockfile_override_remotes.reverse_each do |override|
+          out << "  override: #{override}\n"
         end
         out << "  specs:\n"
       end
@@ -272,6 +284,11 @@ module Bundler
         @remote_cooldowns[uri]
       end
 
+      def add_override_remote(source)
+        uri = normalize_uri(source)
+        @override_remotes.unshift(uri) unless @override_remotes.include?(uri)
+      end
+
       def spec_names
         if dependency_api_available?
           remote_specs.spec_names
@@ -297,6 +314,17 @@ module Bundler
 
       def fetchers
         @fetchers ||= remote_fetchers.values.freeze
+      end
+
+      def override_remote_fetchers
+        @override_remote_fetchers ||= @override_remotes.to_h do |uri|
+          remote = Source::Rubygems::Remote.new(uri)
+          [remote, Bundler::Fetcher.new(remote)]
+        end.freeze
+      end
+
+      def override_fetchers
+        @override_fetchers ||= override_remote_fetchers.values.freeze
       end
 
       def double_check_for(unmet_dependency_names)
@@ -359,6 +387,10 @@ module Bundler
 
       def credless_remotes
         remotes.map(&method(:remove_auth))
+      end
+
+      def credless_override_remotes
+        override_remotes.map(&method(:remove_auth))
       end
 
       def cached_gem(spec)
@@ -437,6 +469,8 @@ module Bundler
             else
               fetch_names(fetchers, nil, idx)
             end
+
+            fetch_override_specs(idx) if @override_remotes.any? && @allow_remote
           end
         end
       end
@@ -465,6 +499,51 @@ module Bundler
             index.use f.specs_with_retry(nil, self)
           end
         end
+      end
+
+      # Merge spec from override remotes into +idx+, but only for gems already
+      # present in the parent source.
+      def fetch_override_specs(idx)
+        local_platform = Bundler.local_platform
+
+        override_fetchers.each do |fetcher|
+          filtered_uri = URICredentialsFilter.credential_filtered_uri(fetcher.uri)
+          begin
+            Bundler.ui.info "Fetching override gem metadata from #{filtered_uri}", Bundler.ui.debug?
+            override_index = fetcher.specs_with_retry(dependency_names, self)
+            Bundler.ui.info "" unless Bundler.ui.debug?
+
+            override_index.each do |spec|
+              primary_specs = idx.search(spec.name)
+              if primary_specs.empty?
+                raise GemfileError, "Override source #{filtered_uri} provides #{spec.name}, but no version of #{spec.name} exists in the primary source. Override sources may only supply alternate builds for gems already present in the primary source."
+              end
+
+              unless primary_specs.any? {|s| s.version == spec.version }
+                Bundler.ui.debug "Skipping #{spec.full_name} from override source #{filtered_uri} (no matching version in parent source)"
+                next
+              end
+
+              unless spec.installable_on_platform?(local_platform)
+                Bundler.ui.debug "Skipping #{spec.full_name} from override source #{filtered_uri} (platform #{spec.platform} not compatible with #{local_platform})"
+                next
+              end
+
+              idx << spec
+            end
+          rescue Bundler::Fetcher::AuthenticationRequiredError, Bundler::Fetcher::BadAuthenticationError, Bundler::Fetcher::AuthenticationForbiddenError => e
+            warn_override_failure(filtered_uri, "requires authentication", e)
+          rescue Bundler::Fetcher::CertificateFailureError, Bundler::Fetcher::SSLError => e
+            warn_override_failure(filtered_uri, "has SSL errors", e)
+          rescue Bundler::Fetcher::FallbackError, Bundler::HTTPError => e
+            warn_override_failure(filtered_uri, "is unreachable", e)
+          end
+        end
+      end
+
+      def warn_override_failure(filtered_uri, reason, error)
+        Bundler.ui.warn "Override source #{filtered_uri} #{reason}: #{error.message}. Falling back to source compilation."
+        Bundler.ui.debug "#{error.class}: #{error.message}"
       end
 
       def fetch_gem_if_possible(spec, previous_spec = nil)
@@ -551,6 +630,15 @@ module Bundler
         @lockfile_remotes || credless_remotes
       end
 
+      def lockfile_override_remotes
+        @lockfile_override_remotes || credless_override_remotes
+      end
+
+      # Combined lookup for download_gem - includes both primary and override fetchers
+      def all_remote_fetchers
+        @all_remote_fetchers ||= remote_fetchers.merge(override_remote_fetchers).freeze
+      end
+
       # Checks if the requested spec exists in the global cache. If it does,
       # we copy it to the download path, and if it does not, we download it.
       #
@@ -566,7 +654,7 @@ module Bundler
       def download_gem(spec, download_cache_path, previous_spec = nil)
         uri = spec.remote.uri
         Bundler.ui.confirm("Fetching #{version_message(spec, previous_spec)}")
-        gem_remote_fetcher = remote_fetchers.fetch(spec.remote).gem_remote_fetcher
+        gem_remote_fetcher = all_remote_fetchers.fetch(spec.remote).gem_remote_fetcher
 
         Plugin.hook(Plugin::Events::GEM_BEFORE_FETCH, spec)
         begin
