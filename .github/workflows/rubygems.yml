@@ -97,6 +97,70 @@ jobs:
 
     timeout-minutes: 60
 
+  rubygems-openssl:
+    name: RubyGems with AWS-LC
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Keep the AWS-LC build and cache behavior aligned with ruby/openssl.
+      # https://github.com/ruby/openssl/blob/master/.github/workflows/test.yml
+      # Caches that are accessed at least once a week can remain permanently.
+      # Include the current week in the key so the latest AWS-LC is built weekly.
+      # https://github.com/actions/cache#cache-limits
+      - name: Get current week
+        id: current-week
+        run: echo "week=$(date -u '+%Y%W')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore AWS-LC cache
+        id: cache-aws-lc
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/openssl
+          key: aws-lc-${{ runner.os }}-${{ runner.arch }}-${{ steps.current-week.outputs.week }}
+
+      - name: Compile AWS-LC
+        if: steps.cache-aws-lc.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p tmp/build-aws-lc
+          cd tmp/build-aws-lc
+          git clone https://github.com/aws/aws-lc.git .
+          AWS_LC_RELEASE=$(git tag --sort=-creatordate --list "v*" | head -1)
+          git checkout "$AWS_LC_RELEASE"
+          cmake -DCMAKE_INSTALL_PREFIX="$HOME/openssl" -DCMAKE_INSTALL_LIBDIR=lib
+          make -j4
+          make install
+
+      - name: Setup ruby
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: 4.0.5
+          bundler: none
+
+      - name: Install Ruby OpenSSL against AWS-LC
+        run: |
+          gem install openssl --no-document -- --with-openssl-dir="$HOME/openssl"
+          ruby -e 'spec = Gem::Specification.find_by_name("openssl"); puts "RUBYLIB=#{spec.full_require_paths.join(File::PATH_SEPARATOR)}"' >> "$GITHUB_ENV"
+
+      - name: Verify AWS-LC
+        run: |
+          ruby --disable-gems -ropenssl -e '
+            abort "Ruby OpenSSL did not load AWS-LC" unless OpenSSL::OPENSSL_VERSION.include?("AWS-LC")
+            OpenSSL::PKey.read(File.binread("test/rubygems/mldsa65_private_key.pem"))
+            puts "Ruby OpenSSL #{OpenSSL::VERSION}: #{OpenSSL::OPENSSL_VERSION}"
+          '
+
+      - name: Install Dependencies
+        run: bin/rake setup
+
+      - name: Run Test
+        run: bin/rake test
+
+    timeout-minutes: 60
+
   all-pass:
     name: All rubygems jobs pass
 
@@ -104,6 +168,7 @@ jobs:
 
     needs:
       - rubygems
+      - rubygems-openssl
 
     runs-on: ubuntu-latest
 
