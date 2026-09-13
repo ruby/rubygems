@@ -1,59 +1,233 @@
 # Changelog
 
+Bundler's changelog before 4.0.0, when it was versioned separately from RubyGems, is in [doc/CHANGELOG-bundler-2.x.md](https://github.com/ruby/rubygems/blob/master/doc/CHANGELOG-bundler-2.x.md).
+
+## 4.1.0.beta1 / 2026-09-09
+
+### RubyGems
+
+Changes already released in 4.0.x are not repeated here.
+
+#### Features:
+
+* Add content addressable gems support. Pull request [#9773](https://github.com/ruby/rubygems/pull/9773) by Jenny Shen, Harriet Oughton and Gira Chawda
+* Let the gem and bundle cooldown settings cover each other. Pull request [#9852](https://github.com/ruby/rubygems/pull/9852) by Hiroshi SHIBATA
+* Rubygems: Add PQC ML-DSA support for cryptographically signed gems workflow. Pull request [#9697](https://github.com/ruby/rubygems/pull/9697) by Jun Aruga, Kazuki Yamaguchi and Hiroshi SHIBATA
+* Preserve non-UTF-8 legacy gem metadata. Pull request [#9835](https://github.com/ruby/rubygems/pull/9835) by Stanislav (Stas) Katkov
+* Add an opt-in OS credential store for gem and bundler credentials. Pull request [#9671](https://github.com/ruby/rubygems/pull/9671) by Hiroshi SHIBATA
+* Add --cooldown to gem install, update and outdated. Pull request [#9734](https://github.com/ruby/rubygems/pull/9734) by Hiroshi SHIBATA
+* Adopt the compact index for gem commands. Pull request [#9606](https://github.com/ruby/rubygems/pull/9606) by Hiroshi SHIBATA
+* Replace Molinillo with PubGrub for dependency resolution. Pull request [#9402](https://github.com/ruby/rubygems/pull/9402) by Matt Larraz and Colby Swandale
+* Replace the rubygems-specific lockfile parser with Bundler's parser. Pull request [#9564](https://github.com/ruby/rubygems/pull/9564) by Hiroshi SHIBATA
+* Remove pessimistic versioning in gem command output. Pull request [#9550](https://github.com/ruby/rubygems/pull/9550) by Jeremy Evans
+* Change Gem::Version#approximate_recommendation to be optimistic. Pull request [#9537](https://github.com/ruby/rubygems/pull/9537) by Jeremy Evans
+* Add `--no-build-extension` and `--no-install-plugin` options to gem install. Pull request [#9473](https://github.com/ruby/rubygems/pull/9473) by Hiroshi SHIBATA
+* Push with auto-attestation. Pull request [#9325](https://github.com/ruby/rubygems/pull/9325) by Hiroshi SHIBATA
+* Implement yaml parser written by pure ruby instead of Psych. Pull request [#9352](https://github.com/ruby/rubygems/pull/9352) by Hiroshi SHIBATA
+* Honor concurrent_downloads from .gemrc in Gem::ConfigFile. Pull request [#9339](https://github.com/ruby/rubygems/pull/9339) by Andrii Furmanets
+* Add support for custom error response from external registries. Pull request [#9270](https://github.com/ruby/rubygems/pull/9270) by Luis J. Gonzalez
+* Add global gem cache shared by RubyGems and Bundler. Pull request [#9230](https://github.com/ruby/rubygems/pull/9230) by Anthony Panozzo
+* Write gem files atomically. Pull request [#9154](https://github.com/ruby/rubygems/pull/9154) by Eileen
+
+#### Performance:
+
+* Remove `verify_gz`. Pull request [#9093](https://github.com/ruby/rubygems/pull/9093) by Eileen
+
+#### Enhancements:
+
+* Normalize absolute symlink targets during gem extraction. Pull request [#9860](https://github.com/ruby/rubygems/pull/9860) by Hiroshi SHIBATA
+* Installs bundler 4.1.0.beta1 as a default gem.
+
+#### Breaking changes:
+
+* Stop installing native extension build logs. Pull request [#9700](https://github.com/ruby/rubygems/pull/9700) by Hiroshi SHIBATA
+* Remove Gem::BasicSpecification#datadir and check minor-release deprecation horizons. Pull request [#9842](https://github.com/ruby/rubygems/pull/9842) by Hiroshi SHIBATA
+* Raise an error when building a gem that has a self reference. Pull request [#9392](https://github.com/ruby/rubygems/pull/9392) by Edouard CHIN
+* Revert `DEFAULT_INSTALL_EXTENSION_IN_LIB` and warn `require_relative` with C ext. Pull request [#9390](https://github.com/ruby/rubygems/pull/9390) by Hiroshi SHIBATA
+* Remove deprecated and unused `Gem::List`. Pull request [#9161](https://github.com/ruby/rubygems/pull/9161) by Hiroshi SHIBATA
+
+### Bundler
+
+Changes already released in 4.0.x are not repeated here.
+
+#### Features:
+
+* Add content addressable gems support. Pull request [#9773](https://github.com/ruby/rubygems/pull/9773) by Jenny Shen, Harriet Oughton and Gira Chawda
+* Let the gem and bundle cooldown settings cover each other. Pull request [#9852](https://github.com/ruby/rubygems/pull/9852) by Hiroshi SHIBATA
+* Add a `prune` setting to drop rebuildable install artifacts. Pull request [#9815](https://github.com/ruby/rubygems/pull/9815) by Hiroshi SHIBATA
+* Add an opt-in OS credential store for gem and bundler credentials. Pull request [#9671](https://github.com/ruby/rubygems/pull/9671) by Hiroshi SHIBATA
+* Fetch Bundler metadata through Gem::Request instead of net-http-persistent. Pull request [#9786](https://github.com/ruby/rubygems/pull/9786) by Hiroshi SHIBATA
+* Reuse RubyGems' compact index client in Bundler. Pull request [#9753](https://github.com/ruby/rubygems/pull/9753) by Hiroshi SHIBATA
+* Reuse RubyGems' vendored PubGrub in Bundler. Pull request [#9752](https://github.com/ruby/rubygems/pull/9752) by Hiroshi SHIBATA
+* Use RubyGems' YAML serializer in Bundler. Pull request [#9751](https://github.com/ruby/rubygems/pull/9751) by Hiroshi SHIBATA
+* Reuse RubyGems' vendored SecureRandom in Bundler. Pull request [#9651](https://github.com/ruby/rubygems/pull/9651) by Hiroshi SHIBATA
+* Reuse RubyGems' vendored URI in Bundler. Pull request [#9650](https://github.com/ruby/rubygems/pull/9650) by Hiroshi SHIBATA
+* Fix two issues by including the ruby platform variants in the lock file. Pull request [#9556](https://github.com/ruby/rubygems/pull/9556) by Randy Stauner
+* Fix plugin installation from gemfile. Pull request [#6957](https://github.com/ruby/rubygems/pull/6957) by Cody Cutrer, Diogo Fernandes and Hiroshi SHIBATA
+* Add plugin hooks for Gemfile evaluation and source fetching. Pull request [#9488](https://github.com/ruby/rubygems/pull/9488) by Hiroshi SHIBATA, Cody Cutrer and Marv
+* Use optimistic version constraints in bundle gem output. Pull request [#9533](https://github.com/ruby/rubygems/pull/9533) by Jeremy Evans
+* Extend Gemfile `override` DSL with `:all` target and metadata fields (Phase 2). Pull request [#9530](https://github.com/ruby/rubygems/pull/9530) by Hiroshi SHIBATA
+* Switch bundle add to use optimistic versioning by default. Pull request [#9526](https://github.com/ruby/rubygems/pull/9526) by Jeremy Evans
+* Add Gemfile `override` DSL for version constraints (Phase 1). Pull request [#9517](https://github.com/ruby/rubygems/pull/9517) by Hiroshi SHIBATA
+* Add `--no-build-extension` and `--no-install-plugin` options to gem install. Pull request [#9473](https://github.com/ruby/rubygems/pull/9473) by Hiroshi SHIBATA
+* Include detailed dependencies when gemfile and lockfile are conflicts. Pull request [#9332](https://github.com/ruby/rubygems/pull/9332) by Hiroshi SHIBATA
+* Implement relative path handling for plugin paths. Pull request [#9299](https://github.com/ruby/rubygems/pull/9299) by Hiroshi SHIBATA
+* Bundler/inline: perform installation from a forked child. Pull request [#7941](https://github.com/ruby/rubygems/pull/7941) by Jean Boussier and Hiroshi SHIBATA
+* Add global gem cache shared by RubyGems and Bundler. Pull request [#9230](https://github.com/ruby/rubygems/pull/9230) by Anthony Panozzo
+* Update custom errors with Exception#full_message. Pull request [#8488](https://github.com/ruby/rubygems/pull/8488) by neimadTL
+
+#### Performance:
+
+* Use separate Bundler download and installation workers. Pull request [#9777](https://github.com/ruby/rubygems/pull/9777) by Joshua Young
+* Cache a shared git source only once per command. Pull request [#9689](https://github.com/ruby/rubygems/pull/9689) by Hiroshi SHIBATA
+
+#### Enhancements:
+
+* Reject Bundler redirects that downgrade https to http. Pull request [#9859](https://github.com/ruby/rubygems/pull/9859) by Hiroshi SHIBATA
+
+#### Bug fixes:
+
+* Expand the git source gemspec path before the chdir. Pull request [#9845](https://github.com/ruby/rubygems/pull/9845) by Hiroshi SHIBATA
+
+#### Breaking changes:
+
+* Remove external tool version checks from `bundle env`. Pull request [#9593](https://github.com/ruby/rubygems/pull/9593) by Hiroshi SHIBATA
+* Bundler: ignore patchlevel kwarg in ruby DSL. Pull request [#6023](https://github.com/ruby/rubygems/pull/6023) by Takuya N and Hiroshi SHIBATA
+* Unify RubyGems and Bundler documentation. Pull request [#9237](https://github.com/ruby/rubygems/pull/9237) by Hiroshi SHIBATA
+
+#### Deprecations:
+
+* Rename the no_prune setting to keep_outdated_cache. Pull request [#9816](https://github.com/ruby/rubygems/pull/9816) by Hiroshi SHIBATA
+
 ## 4.0.20 / 2026-09-02
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Print a release notes link instead of the whole changelog on `gem update --system`. Pull request [#9794](https://github.com/ruby/rubygems/pull/9794) by hsbt
 * Installs bundler 4.0.20 as a default gem.
 
-### Bug fixes:
+#### Bug fixes:
 
 * Only coerce exact true and false gemrc values to booleans. Pull request [#9822](https://github.com/ruby/rubygems/pull/9822) by hsbt
 * Make the gem CLI work under RUBY_BOX=1. Pull request [#9810](https://github.com/ruby/rubygems/pull/9810) by hsbt
 
-### Documentation:
+#### Documentation:
 
 * Document and test all available gemrc configuration keys. Pull request [#9568](https://github.com/ruby/rubygems/pull/9568) by junaruga
 
+### Bundler
+
+#### Enhancements:
+
+* Avoid duplicate relative path prefix in bundle exec. Pull request [#9596](https://github.com/ruby/rubygems/pull/9596) by samuel-williams-shopify
+* Follow renamed default branch in git sources. Pull request [#9813](https://github.com/ruby/rubygems/pull/9813) by hsbt
+* Bundler::Source::Git: avoid re-fetching the repo. Pull request [#9806](https://github.com/ruby/rubygems/pull/9806) by byroot
+* Show the newest out-of-cooldown version in bundle outdated. Pull request [#9803](https://github.com/ruby/rubygems/pull/9803) by hsbt
+
+#### Bug fixes:
+
+* Error out when `bundle init --gemspec` gets no specification. Pull request [#9818](https://github.com/ruby/rubygems/pull/9818) by hsbt
+* Fix relative gemspec paths being expanded twice. Pull request [#9814](https://github.com/ruby/rubygems/pull/9814) by hsbt
+* Fix gemspec evaluation under Ruby::Box. Pull request [#9809](https://github.com/ruby/rubygems/pull/9809) by hsbt
+* Fix release date extraction for the current changelog header format. Pull request [#9767](https://github.com/ruby/rubygems/pull/9767) by meganemura
+* Resolve globbed entries literally in Gem::Util.glob_files_in_dir. Pull request [#9802](https://github.com/ruby/rubygems/pull/9802) by hsbt
+* Preserve native extensions during implicit clean. Pull request [#9800](https://github.com/ruby/rubygems/pull/9800) by sjh9714
+
+#### Documentation:
+
+* Clarify :path expectations and cross-link platform docs in man pages. Pull request [#9724](https://github.com/ruby/rubygems/pull/9724) by hsbt
+
 ## 4.0.19 / 2026-08-20
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Reject SafeMarshal collection lengths longer than the remaining input. Pull request [#9756](https://github.com/ruby/rubygems/pull/9756) by hsbt
 * Installs bundler 4.0.19 as a default gem.
 
-### Bug fixes:
+#### Bug fixes:
 
 * Fix gem uninstall --user-install crash when GEM_HOME does not exist. Pull request [#9749](https://github.com/ruby/rubygems/pull/9749) by hsbt
 
-### Documentation:
+#### Documentation:
 
 * Document SPDX license handling for license= and licenses=. Pull request [#9766](https://github.com/ruby/rubygems/pull/9766) by hsbt
 
+### Bundler
+
+#### Enhancements:
+
+* Validate the platform field in Gem::Installer#verify_spec. Pull request [#9780](https://github.com/ruby/rubygems/pull/9780) by hsbt
+* Restrict UserDefined handling to explicit class set for Gem::SafeMashal. Pull request [#9770](https://github.com/ruby/rubygems/pull/9770) by jackorp
+* Filter git command output against the configured URI. Pull request [#9778](https://github.com/ruby/rubygems/pull/9778) by hsbt
+* Summarize cooldown-skipped versions at the end of install, update, and lock. Pull request [#9762](https://github.com/ruby/rubygems/pull/9762) by hsbt
+
+#### Bug fixes:
+
+* Make repeated bundle lock options accumulate. Pull request [#9748](https://github.com/ruby/rubygems/pull/9748) by hsbt
+* Fail instead of warning when frozen mode can't update the lockfile. Pull request [#9750](https://github.com/ruby/rubygems/pull/9750) by hsbt
+* Fix wrong $LOAD_PATH for gems installed in the same process. Pull request [#9784](https://github.com/ruby/rubygems/pull/9784) by hsbt
+
+#### Documentation:
+
+* Fix auto-clean default version in bundle config docs. Pull request [#9783](https://github.com/ruby/rubygems/pull/9783) by hsbt
+* Correct Bundler 5 default path documentation. Pull request [#9771](https://github.com/ruby/rubygems/pull/9771) by alloutflo
+
 ## 4.0.18 / 2026-08-05
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Check the resolved parent directory before extracting old format gems. Pull request [#9755](https://github.com/ruby/rubygems/pull/9755) by hsbt
 * Installs bundler 4.0.18 as a default gem.
 
-### Bug fixes:
+#### Bug fixes:
 
 * Call Kernel.format explicitly in Gem::Deprecate wrapper. Pull request [#9714](https://github.com/ruby/rubygems/pull/9714) by hsbt
 
-### Documentation:
+#### Documentation:
 
 * Point bundler.io URLs at guides.rubygems.org. Pull request [#9737](https://github.com/ruby/rubygems/pull/9737) by hsbt
 
+### Bundler
+
+#### Enhancements:
+
+* Don't mask install errors when no Gemfile can be located. Pull request [#9757](https://github.com/ruby/rubygems/pull/9757) by hsbt
+* Warn when duplicate source declarations conflict on cooldown. Pull request [#9736](https://github.com/ruby/rubygems/pull/9736) by hsbt
+* Redact URI userinfo from settings names in Bundler User-Agent. Pull request [#9716](https://github.com/ruby/rubygems/pull/9716) by hsbt
+* Validate gem name before building compact index cache paths. Pull request [#9717](https://github.com/ruby/rubygems/pull/9717) by hsbt
+
+#### Bug fixes:
+
+* Fail `bundle check` when frozen mode needs lockfile changes. Pull request [#9715](https://github.com/ruby/rubygems/pull/9715) by hsbt
+* Skip empty checksum values in compact index metadata. Pull request [#9713](https://github.com/ruby/rubygems/pull/9713) by hsbt
+
+#### Security:
+
+* Add --cooldown flag to bundle lock and bundle cache. Pull request [#9725](https://github.com/ruby/rubygems/pull/9725) by hsbt
+
+#### Documentation:
+
+* Point bundler.io URLs at guides.rubygems.org. Pull request [#9737](https://github.com/ruby/rubygems/pull/9737) by hsbt
+* Document Bundler checksum behavior for default gems. Pull request [#9735](https://github.com/ruby/rubygems/pull/9735) by p-linnane
+* List missing subcommands in bundle(1) UTILITIES section. Pull request [#9721](https://github.com/ruby/rubygems/pull/9721) by hsbt
+* Document pessimistic operator and eval_gemfile in gemfile(5). Pull request [#9719](https://github.com/ruby/rubygems/pull/9719) by hsbt
+
 ## 4.0.17 / 2026-07-22
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Validate spec name before writing to the spec cache. Pull request [#9690](https://github.com/ruby/rubygems/pull/9690) by hsbt
 * Installs bundler 4.0.17 as a default gem.
 
-### Bug fixes:
+#### Bug fixes:
 
 * Unquote Gem.ruby when spawning it as a separate argv element. Pull request [#9695](https://github.com/ruby/rubygems/pull/9695) by hsbt
 * Escape glob metacharacters in install paths when globbing. Pull request [#9687](https://github.com/ruby/rubygems/pull/9687) by hsbt
@@ -61,97 +235,251 @@
 * Preserve Windows paths in MAKE and rake environment variables. Pull request [#9693](https://github.com/ruby/rubygems/pull/9693) by hsbt
 * Fix `bundle` binstub broken by `gem update --system` on Homebrew ruby. Pull request [#9688](https://github.com/ruby/rubygems/pull/9688) by hsbt
 
+### Bundler
+
+#### Enhancements:
+
+* Open compact index cache in binary mode when appending. Pull request [#9679](https://github.com/ruby/rubygems/pull/9679) by hsbt
+
+#### Bug fixes:
+
+* Unquote Gem.ruby when spawning it as a separate argv element. Pull request [#9695](https://github.com/ruby/rubygems/pull/9695) by hsbt
+* Escape glob metacharacters in install paths when globbing. Pull request [#9687](https://github.com/ruby/rubygems/pull/9687) by hsbt
+* Avoid space-containing absolute path in RUBYOPT. Pull request [#9696](https://github.com/ruby/rubygems/pull/9696) by hsbt
+* Preserve the locked Bundler checksum when the gem isn't cached. Pull request [#9658](https://github.com/ruby/rubygems/pull/9658) by rwstauner
+
+#### Documentation:
+
+* Point Bundler gemspec metadata at the moved docs. Pull request [#9648](https://github.com/ruby/rubygems/pull/9648) by hsbt
+
 ## 4.0.16 / 2026-07-10
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Installs bundler 4.0.16 as a default gem.
 
-### Bug fixes:
+#### Bug fixes:
 
 * Skip the make job server when using BSD make. Pull request [#9676](https://github.com/ruby/rubygems/pull/9676) by flavorjones
 
+### Bundler
+
+#### Enhancements:
+
+* Bundler: Fix Bundler::Fetcher for PQC support, adding integration connection tests. Pull request [#9637](https://github.com/ruby/rubygems/pull/9637) by junaruga
+* Reuse RubyGems' vendored tsort in Bundler. Pull request [#9647](https://github.com/ruby/rubygems/pull/9647) by hsbt
+
+#### Bug fixes:
+
+* Initialize the new gem's git repo without a subshell. Pull request [#9670](https://github.com/ruby/rubygems/pull/9670) by hsbt
+* Preserve CRLF lockfile line endings on Windows. Pull request [#9669](https://github.com/ruby/rubygems/pull/9669) by hsbt
+* Fix the gemspec error snippet on Windows drive-letter paths. Pull request [#9668](https://github.com/ruby/rubygems/pull/9668) by hsbt
+
+#### Documentation:
+
+* Point Bundler gemspec metadata at the moved docs. Pull request [#9648](https://github.com/ruby/rubygems/pull/9648) by hsbt
+
 ## 4.0.15 / 2026-06-24
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Rubygems: Fix Gem::Request for PQC support, adding integration connection tests. Pull request [#9615](https://github.com/ruby/rubygems/pull/9615) by junaruga
 * Reduce peak memory usage of full index loading and bundle install. Pull request [#9618](https://github.com/ruby/rubygems/pull/9618) by hsbt
 * Installs bundler 4.0.15 as a default gem.
 
-### Bug fixes:
+#### Bug fixes:
 
 * Forward security policy to old-format gems. Pull request [#9611](https://github.com/ruby/rubygems/pull/9611) by hsbt
 
+### Bundler
+
+#### Enhancements:
+
+* Resolve Git LFS files in git sources from the real remote. Pull request [#9632](https://github.com/ruby/rubygems/pull/9632) by hsbt
+* Suggest access issues, not only yanking, for missing locked gems. Pull request [#9631](https://github.com/ruby/rubygems/pull/9631) by hsbt
+* Implement a make jobserver (continuation of #9210). Pull request [#9625](https://github.com/ruby/rubygems/pull/9625) by hsbt
+* Reduce peak memory usage of full index loading and bundle install. Pull request [#9618](https://github.com/ruby/rubygems/pull/9618) by hsbt
+* Bump up to rb-sys 0.9.128. Pull request [#9569](https://github.com/ruby/rubygems/pull/9569) by hsbt
+
+#### Bug fixes:
+
+* Skip the make jobserver on Windows. Pull request [#9630](https://github.com/ruby/rubygems/pull/9630) by hsbt
+* Don't require source plugins to be installed to parse a lockfile: 4.0.x. Pull request [#9621](https://github.com/ruby/rubygems/pull/9621) by hsbt
+* Exempt lockfile versions from cooldown on every resolution path. Pull request [#9619](https://github.com/ruby/rubygems/pull/9619) by hsbt
+* Set `Bundler.settings[:ssl_ca_cert]` to download gems. Pull request [#9610](https://github.com/ruby/rubygems/pull/9610) by junaruga
+
 ## 4.0.14 / 2026-06-10
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Add executables and bindir validation to the gem installer. Pull request [#9595](https://github.com/ruby/rubygems/pull/9595) by hsbt
 * Strip C1 control characters from displayed gem text. Pull request [#9597](https://github.com/ruby/rubygems/pull/9597) by hsbt
 * Installs bundler 4.0.14 as a default gem.
 
+### Bundler
+
+#### Bug fixes:
+
+* Preserve per-source cooldown when converging sources from the lockfile. Pull request [#9601](https://github.com/ruby/rubygems/pull/9601) by bryanwoods
+* Don't exclude the locked version from cooldown during bundle update. Pull request [#9599](https://github.com/ruby/rubygems/pull/9599) by hsbt
+
 ## 4.0.13 / 2026-06-03
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Prevent extraction from escaping destination_dir via pre-existing symlinks. Pull request [#9493](https://github.com/ruby/rubygems/pull/9493) by thesmartshadow
 * Close stdin immediately when using popen2e. Pull request [#9540](https://github.com/ruby/rubygems/pull/9540) by rwstauner
 * Fallback to copy symlinks on Windows. Pull request [#9296](https://github.com/ruby/rubygems/pull/9296) by larskanis
 * Installs bundler 4.0.13 as a default gem.
 
+### Bundler
+
+#### Enhancements:
+
+* Do not hard-code permissions for new gem directories during bundle install. Pull request [#9557](https://github.com/ruby/rubygems/pull/9557) by maxfelsher-cgi
+* Clear gem specification cache after acquiring process lock. Pull request [#9310](https://github.com/ruby/rubygems/pull/9310) by ngan
+* Show release date with bundle outdated. Pull request [#9337](https://github.com/ruby/rubygems/pull/9337) by hsbt
+
+#### Bug fixes:
+
+* Apply cooldown to locally installed gem versions. Pull request [#9582](https://github.com/ruby/rubygems/pull/9582) by hsbt
+
+#### Security:
+
+* Add `cooldown` to delay newly published gem. Pull request [#9576](https://github.com/ruby/rubygems/pull/9576) by hsbt
+
 ## 4.0.12 / 2026-05-20
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Remove cygwin from WIN_PATTERNS. Pull request [#9527](https://github.com/ruby/rubygems/pull/9527) by fd00
 * Installs bundler 4.0.12 as a default gem.
 
-### Bug fixes:
+#### Bug fixes:
 
 * Fall back to lockfile version when `BUNDLE_VERSION` is "lockfile". Pull request [#9545](https://github.com/ruby/rubygems/pull/9545) by hsbt
 * Read `BUNDLE_VERSION` env var in `BundlerVersionFinder`. Pull request [#9538](https://github.com/ruby/rubygems/pull/9538) by hsbt
 
+### Bundler
+
+#### Enhancements:
+
+* Make `bundle config get` return status 1 when the value is not set. Pull request [#9505](https://github.com/ruby/rubygems/pull/9505) by willnet
+* Use Pathname#absolute?. Pull request [#9529](https://github.com/ruby/rubygems/pull/9529) by nobu
+* Deprecate parsing non-lockfile content in LockfileParser. Pull request [#9502](https://github.com/ruby/rubygems/pull/9502) by kurotaky
+* Print a warning for a potential confusion from the indirect dependencies. Pull request [#5029](https://github.com/ruby/rubygems/pull/5029) by junaruga
+* Respect Gemfile bundler setting in `Bundler.setup`. Pull request [#4892](https://github.com/ruby/rubygems/pull/4892) by godfat
+
+#### Bug fixes:
+
+* Gracefully handle missing checksums in Compact Index. Pull request [#9492](https://github.com/ruby/rubygems/pull/9492) by jneen
+* Skip git source exclusion when lockfile cannot backfill. Pull request [#9544](https://github.com/ruby/rubygems/pull/9544) by yahonda
+* Fix bundle config gemfile unset behavior. Pull request [#9514](https://github.com/ruby/rubygems/pull/9514) by afurm
+
 ## 4.0.11 / 2026-04-30
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Add commented-out rubygems_mfa_required to bundle gem template. Pull request [#9487](https://github.com/ruby/rubygems/pull/9487) by MatheusRich
 * Clarify the name and meaning of the first argument to `gem spec`. Pull request [#9476](https://github.com/ruby/rubygems/pull/9476) by eregon
 * Installs bundler 4.0.11 as a default gem.
 
+### Bundler
+
+#### Enhancements:
+
+* Update gem creation guide URL to rubygems.org. Pull request [#9500](https://github.com/ruby/rubygems/pull/9500) by nissyi-gh
+* Lock the checksum of Bundler itself in the lockfile. Pull request [#9366](https://github.com/ruby/rubygems/pull/9366) by Edouard-chin
+
+#### Bug fixes:
+
+* Fix installing gems with native extensions + transitive dependencies. Pull request [#9477](https://github.com/ruby/rubygems/pull/9477) by nicholasdower
+* Fix the bundler version not being updated in dev/test lockfile. Pull request [#9463](https://github.com/ruby/rubygems/pull/9463) by Edouard-chin
+* Ensure the release CI doesn't break due to the Bundler checksum feature. Pull request [#9436](https://github.com/ruby/rubygems/pull/9436) by Edouard-chin
+
+#### Documentation:
+
+* Fix formatting for BUNDLE_PREFER_PATCH variable in man page. Pull request [#9474](https://github.com/ruby/rubygems/pull/9474) by toy
+
 ## 4.0.10 / 2026-04-08
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Ignore warnings with spec different platforms. Pull request [#8508](https://github.com/ruby/rubygems/pull/8508) by hsbt
 * Better algorithm for sorting gem version. Pull request [#9421](https://github.com/ruby/rubygems/pull/9421) by Edouard-chin
 * Update SPDX license list as of 2026-02-20. Pull request [#9434](https://github.com/ruby/rubygems/pull/9434) by hsbt
 * Installs bundler 4.0.10 as a default gem.
 
-### Bug fixes:
+#### Bug fixes:
 
 * Register native extension files in default spec map. Pull request [#9431](https://github.com/ruby/rubygems/pull/9431) by hsbt
 * Fix NoMethodError in Gem.try_activate when activation conflicts occur. Pull request [#9404](https://github.com/ruby/rubygems/pull/9404) by hsbt
 
+### Bundler
+
+#### Enhancements:
+
+* Ignore warnings with spec different platforms. Pull request [#8508](https://github.com/ruby/rubygems/pull/8508) by hsbt
+* Improve error message when current platform is not in lockfile. Pull request [#9439](https://github.com/ruby/rubygems/pull/9439) by 55728
+* Cache package version selection. Pull request [#9410](https://github.com/ruby/rubygems/pull/9410) by Edouard-chin
+* Check happy path first when comparing gem version. Pull request [#9417](https://github.com/ruby/rubygems/pull/9417) by Edouard-chin
+* [feature] default_cli_command for config what command bundler runs when no specific command is provided. Pull request [#8886](https://github.com/ruby/rubygems/pull/8886) by jonbarlo
+* Introduce a fast path for comparing Gem::Version. Pull request [#9414](https://github.com/ruby/rubygems/pull/9414) by Edouard-chin
+
+#### Bug fixes:
+
+* Restore rb_sys dependency for Rust. Pull request [#9416](https://github.com/ruby/rubygems/pull/9416) by bangseongbeom
+
 ## 4.0.9 / 2026-03-25
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Fix: include owner role in `gem owner`. Pull request [#9403](https://github.com/ruby/rubygems/pull/9403) by gjtorikian
 * Installs bundler 4.0.9 as a default gem.
 
-### Bug fixes:
+#### Bug fixes:
 
 * Fix: Ensure trailing slash is added to source URIs added via gem sources. Pull request [#9055](https://github.com/ruby/rubygems/pull/9055) by zirni
 
-### Documentation:
+#### Documentation:
 
 * [DOC] Fix link. Pull request [#9409](https://github.com/ruby/rubygems/pull/9409) by BurdetteLamar
 
+### Bundler
+
+#### Enhancements:
+
+* Check the git version only **once** per `bundle install`. Pull request [#9406](https://github.com/ruby/rubygems/pull/9406) by Edouard-chin
+* Normalize the number of workers when performing parallel operations. Pull request [#9400](https://github.com/ruby/rubygems/pull/9400) by Edouard-chin
+* Add exponential backoff to bundler retries. Pull request [#9163](https://github.com/ruby/rubygems/pull/9163) by ChrisBr
+* Introduce a priority queue. Pull request [#9389](https://github.com/ruby/rubygems/pull/9389) by Edouard-chin
+* Split the download and install process of a gem. Pull request [#9381](https://github.com/ruby/rubygems/pull/9381) by Edouard-chin
+
+#### Bug fixes:
+
+* Retry git fetch without --depth for dumb HTTP transport. Pull request [#9405](https://github.com/ruby/rubygems/pull/9405) by hsbt
+
 ## 4.0.8 / 2026-03-11
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Use JSON for cargo metadata parsing. Pull request
   [#9373](https://github.com/ruby/rubygems/pull/9373) by hsbt
@@ -160,14 +488,27 @@
   [#9362](https://github.com/ruby/rubygems/pull/9362) by afurm
 * Installs bundler 4.0.8 as a default gem.
 
-### Documentation:
+#### Documentation:
 
 * Unify Compact Index API naming. Pull request
   [#9372](https://github.com/ruby/rubygems/pull/9372) by simi
 
+### Bundler
+
+#### Enhancements:
+
+* Add a new Bundler config to control how many specs are fetched [#9363](https://github.com/ruby/rubygems/pull/9363)
+* Restrict GitHub Actions workflow permissions for newgem [#9361](https://github.com/ruby/rubygems/pull/9361)
+
+#### Bug fixes:
+
+* Fix plugin new version not registering [#9355](https://github.com/ruby/rubygems/pull/9355)
+
 ## 4.0.7 / 2026-02-25
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Add Gem.disable_system_update_message in setup.rb. Pull request
   [#9020](https://github.com/ruby/rubygems/pull/9020) by hyuraku
@@ -175,24 +516,59 @@
   [#9312](https://github.com/ruby/rubygems/pull/9312) by hsbt
 * Installs bundler 4.0.7 as a default gem.
 
-### Documentation:
+#### Documentation:
 
 * Document gemspecs must be deterministic. Pull request
   [#9321](https://github.com/ruby/rubygems/pull/9321) by fxn
 * Remove "##" from a comment to require. Pull request
   [#9306](https://github.com/ruby/rubygems/pull/9306) by tompng
 
+### Bundler
+
+#### Enhancements:
+
+* Don't check whether a plugin needs to be installed: [#9328](https://github.com/ruby/rubygems/pull/9328)
+* [rust gem] Major improvements for gem scaffolding (rebased) [#8455](https://github.com/ruby/rubygems/pull/8455)
+* Fix(bundler): only preload git sources for requested groups [#9234](https://github.com/ruby/rubygems/pull/9234)
+* Raise error when gem contains capital letters [#5432](https://github.com/ruby/rubygems/pull/5432)
+
+#### Bug fixes:
+
+* Fix Bundler crashing when it tries to install plugin: [#9335](https://github.com/ruby/rubygems/pull/9335)
+* Run git operations in parallel (take 2): [#9323](https://github.com/ruby/rubygems/pull/9323)
+* Add support for help flag in plugin commands [#9263](https://github.com/ruby/rubygems/pull/9263)
+
+#### Documentation:
+
+* [DOC] Fix link in Bundler [#9315](https://github.com/ruby/rubygems/pull/9315)
+
 ## 4.0.6 / 2026-02-05
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Update vendored resolv to 0.7.0. Pull request
   [#9298](https://github.com/ruby/rubygems/pull/9298) by hsbt
 * Installs bundler 4.0.6 as a default gem.
 
+### Bundler
+
+#### Bug fixes:
+
+* Fix gzip cache corruption when recovering from HTTP 416 responses [#9272](https://github.com/ruby/rubygems/pull/9272)
+* Fallback git/path sources to default source [#9301](https://github.com/ruby/rubygems/pull/9301)
+* Ensure revision is always re-resolved in `git_proxy.rb` [#9294](https://github.com/ruby/rubygems/pull/9294)
+
+#### Documentation:
+
+* Clarify local gem override docs to require git-sourced gems [#9305](https://github.com/ruby/rubygems/pull/9305)
+
 ## 4.0.5 / 2026-01-29
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Removed unused deprecate loading. Pull request
   [#9266](https://github.com/ruby/rubygems/pull/9266) by hsbt
@@ -200,70 +576,135 @@
   [#9257](https://github.com/ruby/rubygems/pull/9257) by hsbt
 * Installs bundler 4.0.5 as a default gem.
 
-### Bug fixes:
+#### Bug fixes:
 
 * Fix RubyGems not able to require the right gem:. Pull request
   [#9246](https://github.com/ruby/rubygems/pull/9246) by Edouard-chin
 * Remove special behavior for rake. Pull request
   [#9245](https://github.com/ruby/rubygems/pull/9245) by JasonLunn
 
-### Documentation:
+#### Documentation:
 
 * Added another usage of pristine command. Pull request
   [#9255](https://github.com/ruby/rubygems/pull/9255) by hsbt
 
+### Bundler
+
+#### Enhancements:
+
+* Fix Bundler that re-exec $0 when a `version` is present in the config: [#9249](https://github.com/ruby/rubygems/pull/9249)
+
+#### Bug fixes:
+
+* Only use parent source with Git and Path sources [#9269](https://github.com/ruby/rubygems/pull/9269)
+
 ## 4.0.4 / 2026-01-15
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Remove date require from rebuild command. Pull request
   [#9232](https://github.com/ruby/rubygems/pull/9232) by jeremyevans
 * Installs bundler 4.0.4 as a default gem.
 
-### Bug fixes:
+#### Bug fixes:
 
 * Add a missing "require 'etc'" statement:. Pull request
   [#9242](https://github.com/ruby/rubygems/pull/9242) by Edouard-chin
 
+### Bundler
+
+#### Enhancements:
+
+* Validate more options for add sub-command [#5905](https://github.com/ruby/rubygems/pull/5905)
+* Support Ruby 4.1 [#9219](https://github.com/ruby/rubygems/pull/9219)
+
+#### Bug fixes:
+
+* Fix dependency source bug in bundler [#9213](https://github.com/ruby/rubygems/pull/9213)
+* Retain current bundler version on `bundle clean` [#9221](https://github.com/ruby/rubygems/pull/9221)
+
 ## 4.0.3 / 2025-12-23
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Installs bundler 4.0.3 as a default gem.
 
-### Documentation:
+#### Documentation:
 
 * Fix broken documentation links. Pull request
   [#9208](https://github.com/ruby/rubygems/pull/9208) by eileencodes
 
+### Bundler
+
+#### Enhancements:
+
+* Fall back to ruby platform gem when precompiled variant is incompatible [#9211](https://github.com/ruby/rubygems/pull/9211)
+
 ## 4.0.2 / 2025-12-17
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Pass down value of `BUNDLE_JOBS` to RubyGems before compiling &
   introduce a new `gem install -j` flag. Pull request
   [#9171](https://github.com/ruby/rubygems/pull/9171) by Edouard-chin
 * Installs bundler 4.0.2 as a default gem.
 
+### Bundler
+
+#### Enhancements:
+
+* Support single quotes in mise format ruby version [#9183](https://github.com/ruby/rubygems/pull/9183)
+* Tweak the Bundler's "X gems now installed message": [#9194](https://github.com/ruby/rubygems/pull/9194)
+
+#### Bug fixes:
+
+* Allow to show cli_help with `bundler` executable [#9198](https://github.com/ruby/rubygems/pull/9198)
+* Allow bundle pristine to work for git gems in the same repo [#9196](https://github.com/ruby/rubygems/pull/9196)
+
 ## 4.0.1 / 2025-12-09
 
-### Enhancements:
+### RubyGems
+
+#### Enhancements:
 
 * Installs bundler 4.0.1 as a default gem.
 
-### Bug fixes:
+#### Bug fixes:
 
 * Fixed unexpected default bundler installation. Pull request
   [#9167](https://github.com/ruby/rubygems/pull/9167) by hsbt
 
-### Documentation:
+#### Documentation:
 
 * Update contributing docs with `RGV`. Pull request
   [#9155](https://github.com/ruby/rubygems/pull/9155) by eileencodes
 
+### Bundler
+
+#### Performance:
+
+* Increase connection pool to allow for up to 70% speed increase on `bundle install` [#9087](https://github.com/ruby/rubygems/pull/9087)
+
+#### Enhancements:
+
+* Fix the config suggestion in the warning for `$ bundle` [#9164](https://github.com/ruby/rubygems/pull/9164)
+* Fix native extension loading in newgem template for RHEL-based systems [#9156](https://github.com/ruby/rubygems/pull/9156)
+
+#### Bug fixes:
+
+* Fix Bundler removing executables after creating them [#9169](https://github.com/ruby/rubygems/pull/9169)
+
 ## 4.0.0 / 2025-12-03
 
-### Features:
+### RubyGems
+
+#### Features:
 
 * Undeprecate `Gem::Version.new(nil)`. Pull request
   [#9086](https://github.com/ruby/rubygems/pull/9086) by tenderlove
@@ -272,7 +713,7 @@
 * Add pattern matching support to Gem::Platform. Pull request
   [#9062](https://github.com/ruby/rubygems/pull/9062) by baweaver
 
-### Performance:
+#### Performance:
 
 * Add `MAKEFLAGS=-j` by default before compiling. Pull request
   [#9131](https://github.com/ruby/rubygems/pull/9131) by Edouard-chin
@@ -289,7 +730,7 @@
 * Use File#chmod rather than FileUtils.chmod. Pull request
   [#8965](https://github.com/ruby/rubygems/pull/8965) by tenderlove
 
-### Enhancements:
+#### Enhancements:
 
 * Update all vendored libraries to latest version. Pull request
   [#9089](https://github.com/ruby/rubygems/pull/9089) by hsbt
@@ -325,7 +766,7 @@
   deivid-rodriguez
 * Installs bundler 4.0.0 as a default gem.
 
-### Bug fixes:
+#### Bug fixes:
 
 * Fix test failure of mswin and nmake. Pull request
   [#9135](https://github.com/ruby/rubygems/pull/9135) by hsbt
@@ -337,12 +778,12 @@
   request [#8939](https://github.com/ruby/rubygems/pull/8939) by
   deivid-rodriguez
 
-### Security:
+#### Security:
 
 * Bump up vendored URI to 1.0.4. Pull request
   [#9031](https://github.com/ruby/rubygems/pull/9031) by hsbt
 
-### Breaking changes:
+#### Breaking changes:
 
 * Removed deprecated `-C` option from gem build. Pull request
   [#9088](https://github.com/ruby/rubygems/pull/9088) by hsbt
@@ -361,12 +802,12 @@
 * Removed `compatibility.rb` for RG 4.0. Pull request
   [#8899](https://github.com/ruby/rubygems/pull/8899) by hsbt
 
-### Deprecations:
+#### Deprecations:
 
 * Deprecate `Gem::Specification#datadir`. Pull request
   [#8900](https://github.com/ruby/rubygems/pull/8900) by hsbt
 
-### Documentation:
+#### Documentation:
 
 * Unified UPGRADING.md and extract blog.rubygems.org. Pull request
   [#9148](https://github.com/ruby/rubygems/pull/9148) by hsbt
@@ -382,6 +823,110 @@
   [#8849](https://github.com/ruby/rubygems/pull/8849) by deivid-rodriguez
 * Update Code of Conduct email to conduct@rubygems.org. Pull request
   [#8848](https://github.com/ruby/rubygems/pull/8848) by indirect
+
+### Bundler
+
+#### Features:
+
+* Support bundle install --lockfile option [#9111](https://github.com/ruby/rubygems/pull/9111)
+* Add support for lockfile in Gemfile and bundle install --no-lock [#9059](https://github.com/ruby/rubygems/pull/9059)
+* Add `--ext=go` to `bundle gem` [#8183](https://github.com/ruby/rubygems/pull/8183)
+* Update Bundler::CurrentRuby::ALL_RUBY_VERSIONS [#9058](https://github.com/ruby/rubygems/pull/9058)
+* Introduce `bundle list --format=json` [#8728](https://github.com/ruby/rubygems/pull/8728)
+
+#### Performance:
+
+* Run git operations in parallel to speed things up: [#9100](https://github.com/ruby/rubygems/pull/9100)
+* Replace instance method look up in plugin installer [#9094](https://github.com/ruby/rubygems/pull/9094)
+* Adjust the API_REQUEST_LIMIT to make less network roundtrip [#9071](https://github.com/ruby/rubygems/pull/9071)
+
+#### Enhancements:
+
+* Make BUNDLE_LOCKFILE environment variable have precedence over lockfile method in Gemfile [#9146](https://github.com/ruby/rubygems/pull/9146)
+* Improve banner message for the default command [#9145](https://github.com/ruby/rubygems/pull/9145)
+* Introduce `install_or_cli_help` and use it default `bundle` command [#9136](https://github.com/ruby/rubygems/pull/9136)
+* Add go_gem/rake_task for Go native extension gem skeleton [#9105](https://github.com/ruby/rubygems/pull/9105)
+* Warn users that `bundle` now display the help: [#9092](https://github.com/ruby/rubygems/pull/9092)
+* Use DidYouMean::SpellChecker for gem suggestions in Bundler [#3857](https://github.com/ruby/rubygems/pull/3857)
+* Update all vendored libraries to latest version [#9089](https://github.com/ruby/rubygems/pull/9089)
+* We don't need to allow some warning now [#9074](https://github.com/ruby/rubygems/pull/9074)
+* Support to embedded Pathname [#9056](https://github.com/ruby/rubygems/pull/9056)
+* Enforce activation of irb when running with bundle console [#9033](https://github.com/ruby/rubygems/pull/9033)
+* Update Magnus version in Rust extension gem template [#9025](https://github.com/ruby/rubygems/pull/9025)
+* Add checksum of gems hosted on private servers: [#9004](https://github.com/ruby/rubygems/pull/9004)
+* Loading support on Windows [#8254](https://github.com/ruby/rubygems/pull/8254)
+* Improve error message when the same source is specified through `gemspec` and `path` [#8460](https://github.com/ruby/rubygems/pull/8460)
+* Raise an error in frozen mode if some registry gems have empty checksums [#8888](https://github.com/ruby/rubygems/pull/8888)
+* Bump vendored thor to 1.4.0 [#8883](https://github.com/ruby/rubygems/pull/8883)
+* Delay default path and global cache changes to Bundler 5 [#8867](https://github.com/ruby/rubygems/pull/8867)
+* Fix spacing in bundle gem newgem.gemspec.tt [#8865](https://github.com/ruby/rubygems/pull/8865)
+* Add some missing deprecation messages [#8844](https://github.com/ruby/rubygems/pull/8844)
+
+#### Bug fixes:
+
+* Fixed checksums generation issue when no source is specified [#9133](https://github.com/ruby/rubygems/pull/9133)
+* Check for file existence before deletion from cache [#9095](https://github.com/ruby/rubygems/pull/9095)
+* Use method_defined?(:method, false) [#9098](https://github.com/ruby/rubygems/pull/9098)
+* Handle BUNDLER_VERSION being set to an empty string [#6928](https://github.com/ruby/rubygems/pull/6928)
+* Fix `bundle install` when the Gemfile contains "install_if" git gems: [#8992](https://github.com/ruby/rubygems/pull/8992)
+* Fix installation issue related to path sources and precompiled gems [#8973](https://github.com/ruby/rubygems/pull/8973)
+* Fix outdated lockfile during `bundle lock` when source changes [#8962](https://github.com/ruby/rubygems/pull/8962)
+* Raise error on missing version file [#8963](https://github.com/ruby/rubygems/pull/8963)
+* Fix `bundle cache --frozen` and `bundle cache --no-prune` not printing a deprecation message [#8926](https://github.com/ruby/rubygems/pull/8926)
+* Fix local installation incorrectly forced if there's a `vendor/cache` directory and frozen mode is set [#8925](https://github.com/ruby/rubygems/pull/8925)
+* Fix `bundle lock --update <gem>` with `--lockfile` flag updating all gems [#8922](https://github.com/ruby/rubygems/pull/8922)
+* Fix `bundle show --verbose` and recommend it as an alternative to `bundle show --outdated` [#8915](https://github.com/ruby/rubygems/pull/8915)
+* Fix `bundle cache --no-all` not printing a deprecation warning [#8912](https://github.com/ruby/rubygems/pull/8912)
+* Fix `bundle update foo` unable to update foo in an edge case [#8897](https://github.com/ruby/rubygems/pull/8897)
+* Fix Bundler printing more flags than actually passed in verbose mode [#8914](https://github.com/ruby/rubygems/pull/8914)
+* Fix bundler failing to install sorbet-static in truffleruby when there's no lockfile [#8872](https://github.com/ruby/rubygems/pull/8872)
+* Cancel deprecation of `--force` flag to `bundle install` and `bundle update` [#8843](https://github.com/ruby/rubygems/pull/8843)
+
+#### Security:
+
+* Bump up vendored URI to 1.0.4 [#9031](https://github.com/ruby/rubygems/pull/9031)
+
+#### Breaking changes:
+
+* Fix triple spacing when generating lockfile [#9076](https://github.com/ruby/rubygems/pull/9076)
+* Hide patchlevel from lockfile [#7772](https://github.com/ruby/rubygems/pull/7772)
+* Remove `bundler_4_mode` [#9038](https://github.com/ruby/rubygems/pull/9038)
+* Pick and add extra changes for 4.0.0 version [#9018](https://github.com/ruby/rubygems/pull/9018)
+* Replaced Bundler::SharedHelpers.major_deprecation to feature_removed! or feature_deprecated! [#9016](https://github.com/ruby/rubygems/pull/9016)
+* Removed legacy_check option from SpecSet#for [#9015](https://github.com/ruby/rubygems/pull/9015)
+* Make update_requires_all_flag to settings [#9011](https://github.com/ruby/rubygems/pull/9011)
+* Make default cli command settings [#9010](https://github.com/ruby/rubygems/pull/9010)
+* Make global_gem_cache flag to settings [#9009](https://github.com/ruby/rubygems/pull/9009)
+* Consolidate removal of `Bundler.rubygems.all_specs` [#9008](https://github.com/ruby/rubygems/pull/9008)
+* Consolidate removal of `Bundler::SpecSet#-` and `Bundler::SpecSet#<<` [#9007](https://github.com/ruby/rubygems/pull/9007)
+* Replaced Bundler.feature_flag.plugins? to Bundler.settings [#9006](https://github.com/ruby/rubygems/pull/9006)
+* Make `bundle show --outdated` raise an error [#8980](https://github.com/ruby/rubygems/pull/8980)
+* Make `--local-git` flag to `bundle plugin install` raise an error [#8979](https://github.com/ruby/rubygems/pull/8979)
+* Switch `cache_all` to be `true` by default [#8975](https://github.com/ruby/rubygems/pull/8975)
+* Completely forbid passing `--ext` to `bundle gem` without a value [#8976](https://github.com/ruby/rubygems/pull/8976)
+* Switch `lockfile_checksums` to be `true` by default [#8981](https://github.com/ruby/rubygems/pull/8981)
+* Make `bundle install --binstubs` raise an error [#8978](https://github.com/ruby/rubygems/pull/8978)
+* Make `bundle remove --install` raise an error [#8977](https://github.com/ruby/rubygems/pull/8977)
+* Remove support for multiple global sources in Gemfile & lockfile [#8968](https://github.com/ruby/rubygems/pull/8968)
+* Remove `allow_offline_install` setting [#8969](https://github.com/ruby/rubygems/pull/8969)
+* Completely remove `--rubocop` flag to `bundle gem`, and related configuration [#8967](https://github.com/ruby/rubygems/pull/8967)
+* Completely remove all remembered CLI flags [#8958](https://github.com/ruby/rubygems/pull/8958)
+* Remove implementation of `deployment`, `capistrano` and `vlad` entrypoints [#8957](https://github.com/ruby/rubygems/pull/8957)
+* Remove deprecated `Bundler.*clean*`, and `Bundler.environment` helpers [#8924](https://github.com/ruby/rubygems/pull/8924)
+* Remove deprecated `bundle viz` and `bundle inject` commands [#8923](https://github.com/ruby/rubygems/pull/8923)
+* Removed to workaround for Bundler 2.2 [#8903](https://github.com/ruby/rubygems/pull/8903)
+
+#### Documentation:
+
+* Unified UPGRADING.md and extract blog.rubygems.org [#9148](https://github.com/ruby/rubygems/pull/9148)
+* Remove italic formatting from changelog section headers [#9128](https://github.com/ruby/rubygems/pull/9128)
+* Small clarifications to Bundler 4 upgrade docs [#8964](https://github.com/ruby/rubygems/pull/8964)
+* Improve documentation of `bundle doctor`, `bundle plugin`, and `bundle config` [#8919](https://github.com/ruby/rubygems/pull/8919)
+* Make sure all CLI flags and subcommands are documented [#8861](https://github.com/ruby/rubygems/pull/8861)
+* Clarify documentation about new default gem installation directory in Bundler 4 [#8857](https://github.com/ruby/rubygems/pull/8857)
+* Use mailto link in Code of Conduct [#8849](https://github.com/ruby/rubygems/pull/8849)
+* Update Code of Conduct email to conduct@rubygems.org [#8848](https://github.com/ruby/rubygems/pull/8848)
+* Add missing link to `irb` repo in DEBUGGING.md [#8842](https://github.com/ruby/rubygems/pull/8842)
 
 ## 3.7.2 / 2025-09-09
 

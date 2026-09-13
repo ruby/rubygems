@@ -131,7 +131,9 @@ jobs:
           bin/rake dev:deps version:update_locked_bundler
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -am "Simulate release version"
+          # On release branches the version constants already have no .dev suffix,
+          # so there is nothing to simulate and nothing to commit.
+          git diff --quiet || git commit -am "Simulate release version"
       - name: Check lockfiles do not depend on the local gem cache
         run: |
           version=$(ruby -Ilib -rbundler/version -e 'puts Bundler::VERSION')

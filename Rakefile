@@ -105,7 +105,7 @@ task "coverage:report" do
     next
   end
 
-  $stdout = File.open(File::NULL, "w")
+  $stderr = File.open(File::NULL, "w")
   SimpleCov.collate Dir[resultset] do
     coverage_dir "coverage"
     skip "/test/"
@@ -124,7 +124,7 @@ task "coverage:report" do
     end
   end
 ensure
-  $stdout = STDOUT
+  $stderr = STDERR
 end
 
 spec = Gem::Specification.load(File.expand_path("rubygems-update.gemspec", __dir__))
@@ -138,7 +138,7 @@ RDoc::Task.new rdoc: "docs", clobber_rdoc: "clobber_docs" do |doc|
 
   rdoc_files = Rake::FileList.new %w[lib]
   rdoc_files.add %w[CHANGELOG.md LICENSE.txt MIT.txt CODE_OF_CONDUCT.md CONTRIBUTING.md
-                    doc/MAINTAINERS.txt Manifest.txt doc/POLICIES.md README.md doc/UPGRADING.md CHANGELOG-bundler.md
+                    doc/MAINTAINERS.txt Manifest.txt doc/POLICIES.md README.md doc/UPGRADING.md
                     hide_lib_for_update/note.txt].map(&:freeze)
 
   doc.rdoc_files = rdoc_files
@@ -162,6 +162,46 @@ namespace :vendor do
     Spec::Rubygems.check_source_control_changes(
       success_message: "Vendored gems are in sync",
       error_message: "Vendored gems are out of sync. Please update the vendored lib patches."
+    )
+  end
+
+  # Pinned upstream revision of rubygems/rubygems.org that the vendored
+  # compact_index copy is generated from. Bump this (or pass COMPACT_INDEX_REF)
+  # and re-run the task to refresh.
+  COMPACT_INDEX_REF = "30703392778df8f2fb63d4cc1f45a64ffbeb7629"
+  COMPACT_INDEX_FILES = %w[
+    lib/compact_index.rb
+    lib/compact_index/dependency.rb
+    lib/compact_index/gem.rb
+    lib/compact_index/gem_version.rb
+    lib/compact_index/versions_file.rb
+  ].freeze
+
+  desc "Vendor spec-suite compact_index from rubygems.org (COMPACT_INDEX_REF to override ref)"
+  task :compact_index do
+    require "open-uri"
+    require "fileutils"
+
+    ref = ENV["COMPACT_INDEX_REF"] || COMPACT_INDEX_REF
+    dest_root = File.expand_path("spec/support/vendor/compact_index", __dir__)
+
+    COMPACT_INDEX_FILES.each do |path|
+      url = "https://raw.githubusercontent.com/rubygems/rubygems.org/#{ref}/#{path}"
+      contents = URI.parse(url).open(&:read).gsub("CompactIndex", "VendoredCompactIndex")
+
+      target = File.join(dest_root, path)
+      FileUtils.mkdir_p(File.dirname(target))
+      File.write(target, contents)
+    end
+
+    puts "Vendored compact_index from rubygems.org@#{ref} into #{dest_root}"
+  end
+
+  desc "Check vendored compact_index is up to date"
+  task compact_index_check: :compact_index do
+    Spec::Rubygems.check_source_control_changes(
+      success_message: "Vendored compact_index is in sync",
+      error_message: "Vendored compact_index is out of sync. Run `rake vendor:compact_index`."
     )
   end
 end
@@ -219,12 +259,11 @@ task :clear_package do
   rm_rf "pkg"
 end
 
-desc "Generates the RubyGems changelog for a specific target version"
+desc "Generates the changelog for a specific target version"
 task :generate_changelog, [:version] => [:install_release_dependencies] do |_t, opts|
   require_relative "tool/release"
 
-  Release.for_rubygems(opts[:version]).cut_changelog!
-  Rake::Task["bundler:generate_changelog"].invoke(opts[:version])
+  Release.new(opts[:version]).cut_changelog!
 end
 
 desc "Release rubygems-#{v}"
@@ -440,8 +479,7 @@ namespace "blog" do
     email = `git config --get user.email`.strip
 
     require_relative "tool/changelog"
-    rubygems_history = Changelog.for_rubygems(v.to_s)
-    bundler_history = Changelog.for_bundler(v.to_s)
+    history = Changelog.for_release(v.to_s)
 
     require "tempfile"
 
@@ -454,7 +492,7 @@ author: #{name}
 author_email: #{email}
 ---
 
-RubyGems #{v} includes #{rubygems_history.change_types_for_blog} and Bundler #{v} includes #{bundler_history.change_types_for_blog}.
+RubyGems and Bundler #{v} include #{history.change_types_for_blog}.
 
 To update to the latest RubyGems you can run:
 
@@ -465,13 +503,9 @@ To update to the latest Bundler you can run:
     gem install bundler [--pre]
     bundle update --bundler=#{v}
 
-## RubyGems Release Notes
+## Release Notes
 
-#{rubygems_history.release_notes_for_blog.join("\n")}
-
-## Bundler Release Notes
-
-#{bundler_history.release_notes_for_blog.join("\n")}
+#{history.release_notes_for_blog.join("\n")}
 
 ## Manual Installation
 
@@ -744,7 +778,6 @@ namespace :bundler do
   require_relative "lib/bundler/gem_helper"
   Bundler::GemHelper.install_tasks(name: "bundler")
   require_relative "spec/support/build_metadata"
-  require_relative "tool/release"
 
   # The rubygems release task tags the release as v#{version} and creates the
   # single GitHub release covering both RubyGems and Bundler, so bundler's
@@ -774,11 +807,6 @@ namespace :bundler do
 
   desc "Push to rubygems.org"
   task "release:rubygem_push" => ["man:check", "bundler:build_metadata"]
-
-  desc "Generates the Bundler changelog for a specific target version"
-  task :generate_changelog, [:version] => [:install_release_dependencies] do |_t, opts|
-    Release.for_bundler(opts[:version]).cut_changelog!
-  end
 
   namespace :release do
     task :check_ruby_version do

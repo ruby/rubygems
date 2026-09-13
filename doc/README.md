@@ -23,6 +23,7 @@ See also the [CONTRIBUTING](../CONTRIBUTING.md) guide for general contribution g
 - [Policies](POLICIES.md) - Project policies, long-term support, and governance
 - [Release](RELEASE.md) - Release process and procedures
 - [Maintainers](MAINTAINERS.txt) - List of project maintainers
+- [Bundler 2.x Changelog](CHANGELOG-bundler-2.x.md) - Bundler's changelog before 4.0.0
 
 ### Development
 

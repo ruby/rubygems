@@ -260,7 +260,7 @@ class QualityCheck
   end
 
   def tracked_files
-    @tracked_files ||= git_ls_files("exe/bundle exe/bundler lib/bundler lib/bundler.rb lib/rubygems/vendor/uri lib/rubygems/vendor/securerandom lib/rubygems/vendor/pub_grub lib/rubygems/yaml_serializer.rb lib/rubygems/cooldown_settings.rb lib/rubygems/compact_index_client* lib/rubygems/credential_store* bundler.gemspec CHANGELOG-bundler.md MIT.txt")
+    @tracked_files ||= git_ls_files("exe/bundle exe/bundler lib/bundler lib/bundler.rb lib/rubygems/vendor/uri lib/rubygems/vendor/securerandom lib/rubygems/vendor/pub_grub lib/rubygems/yaml_serializer.rb lib/rubygems/cooldown_settings.rb lib/rubygems/compact_index_client* lib/rubygems/credential_store* bundler.gemspec MIT.txt")
   end
 
   def lib_tracked_files

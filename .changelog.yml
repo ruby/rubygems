@@ -1,55 +1,62 @@
 ---
 
-rubygems:
-  header_template: "## %new_version / %release_date"
+header_template: "## %new_version / %release_date"
 
-  entry_template: "* %title. Pull request [#%pull_request_number](%pull_request_url) by %pull_request_author"
+entry_template: "* %title. Pull request [#%pull_request_number](%pull_request_url) by %pull_request_authors"
 
-  extra_entry:
-    template: "* %title."
-    label: "rubygems: enhancement"
+extra_entry:
+  template: "* %title."
+  label: "rubygems: enhancement"
 
-  release_date_format: "%Y-%m-%d"
+already_released_template: Changes already released in %released_in are not repeated here.
 
-  changelog_label_mapping:
-    "rubygems: feature": "### Features:"
-    "rubygems: performance": "### Performance:"
-    "rubygems: enhancement": "### Enhancements:"
-    "rubygems: bug fix": "### Bug fixes:"
-    "rubygems: security": "### Security:"
-    "rubygems: breaking change": "### Breaking changes:"
-    "rubygems: deprecation": "### Deprecations:"
-    "rubygems: documentation": "### Documentation:"
-    "rubygems: skip changelog": null
+release_date_format: "%Y-%m-%d"
 
-  patch_level_labels:
-    - "rubygems: enhancement"
-    - "rubygems: bug fix"
-    - "rubygems: security"
-    - "rubygems: documentation"
-    - "rubygems: skip changelog"
+# Commit authors that are tooling rather than people to credit. GitHub app
+# accounts, whose login ends in `[bot]`, are dropped without being listed.
+excluded_credit_logins:
+  - claude
+  - Copilot
 
-bundler:
-  header_template: "## %new_version / %release_date"
+# The accounts of one person: the account they are credited as, followed by
+# the ones they have also committed under, so that one person is not listed
+# twice.
+credit_aliases:
+  byroot:
+    - casperisfine
 
-  entry_template: "* %title. Pull request [#%pull_request_number](%pull_request_url) by %pull_request_author"
+library_headings:
+  rubygems: RubyGems
+  bundler: Bundler
 
-  release_date_format: "%Y-%m-%d"
+changelog_label_mapping:
+  "rubygems: feature": "Features:"
+  "bundler: feature": "Features:"
+  "rubygems: performance": "Performance:"
+  "bundler: performance": "Performance:"
+  "rubygems: enhancement": "Enhancements:"
+  "bundler: enhancement": "Enhancements:"
+  "rubygems: bug fix": "Bug fixes:"
+  "bundler: bug fix": "Bug fixes:"
+  "rubygems: security": "Security:"
+  "bundler: security": "Security:"
+  "rubygems: breaking change": "Breaking changes:"
+  "bundler: breaking change": "Breaking changes:"
+  "rubygems: deprecation": "Deprecations:"
+  "bundler: deprecation": "Deprecations:"
+  "rubygems: documentation": "Documentation:"
+  "bundler: documentation": "Documentation:"
+  "rubygems: skip changelog": null
+  "bundler: skip changelog": null
 
-  changelog_label_mapping:
-    "bundler: feature": "### Features:"
-    "bundler: performance": "### Performance:"
-    "bundler: enhancement": "### Enhancements:"
-    "bundler: bug fix": "### Bug fixes:"
-    "bundler: security": "### Security:"
-    "bundler: breaking change": "### Breaking changes:"
-    "bundler: deprecation": "### Deprecations:"
-    "bundler: documentation": "### Documentation:"
-    "bundler: skip changelog": null
-
-  patch_level_labels:
-    - "bundler: enhancement"
-    - "bundler: bug fix"
-    - "bundler: security"
-    - "bundler: documentation"
-    - "bundler: skip changelog"
+patch_level_labels:
+  - "rubygems: enhancement"
+  - "bundler: enhancement"
+  - "rubygems: bug fix"
+  - "bundler: bug fix"
+  - "rubygems: security"
+  - "bundler: security"
+  - "rubygems: documentation"
+  - "bundler: documentation"
+  - "rubygems: skip changelog"
+  - "bundler: skip changelog"

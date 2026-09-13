@@ -1,4 +1,3 @@
-CHANGELOG-bundler.md
 CHANGELOG.md
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md
@@ -356,6 +355,7 @@ lib/rubygems/compact_index_client/http_fetcher.rb
 lib/rubygems/compact_index_client/parser.rb
 lib/rubygems/compact_index_client/updater.rb
 lib/rubygems/config_file.rb
+lib/rubygems/content_address.rb
 lib/rubygems/cooldown.rb
 lib/rubygems/cooldown_option.rb
 lib/rubygems/cooldown_settings.rb

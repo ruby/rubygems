@@ -1,36 +1,49 @@
 # frozen_string_literal: true
 
 require "tmpdir"
+require "fileutils"
 require "bundler"
 require_relative "../spec/support/build_metadata"
 require_relative "rubygems/helper"
 
 class BuildMetadataGeneratorTest < Test::Unit::TestCase
-  def test_release_date_for_extracts_the_date_from_the_current_changelog_header_format
-    Dir.mktmpdir do |dir|
-      write_changelog(dir, "## 9.9.9 / 2026-08-05")
+  def test_write_build_metadata_stamps_the_given_built_at
+    with_build_metadata_copy do |dir, file|
+      Spec::BuildMetadata.write_build_metadata(dir: dir, built_at: "2100-01-01")
 
-      assert_equal "2026-08-05", Spec::BuildMetadata.send(:release_date_for, "9.9.9", dir: dir)
+      assert_include File.read(file), %(@built_at = "2100-01-01")
     end
   end
 
-  def test_release_date_for_returns_nil_when_the_changelog_has_no_entry_for_the_version
-    Dir.mktmpdir do |dir|
-      write_changelog(dir, "## 1.0.0 / 2026-01-01")
+  def test_write_build_metadata_leaves_built_at_unset_when_not_released
+    with_build_metadata_copy do |dir, file|
+      Spec::BuildMetadata.write_build_metadata(dir: dir, built_at: nil)
 
-      assert_nil Spec::BuildMetadata.send(:release_date_for, "9.9.9", dir: dir)
+      assert_include File.read(file), "@built_at = nil"
+    end
+  end
+
+  def test_write_build_metadata_defaults_to_today_in_the_release_date_format
+    with_build_metadata_copy do |dir, file|
+      Time.stub :now, Time.new(2020, 1, 1) do
+        Spec::BuildMetadata.write_build_metadata(dir: dir)
+      end
+
+      assert_include File.read(file), %(@built_at = "2020-01-01")
     end
   end
 
   private
 
-  def write_changelog(dir, header)
-    File.write(File.join(dir, "CHANGELOG-bundler.md"), <<~CHANGELOG)
-      # Changelog
+  def with_build_metadata_copy
+    Dir.mktmpdir do |dir|
+      file = File.join(dir, "lib/bundler/build_metadata.rb")
+      FileUtils.mkdir_p File.dirname(file)
+      FileUtils.cp Spec::BuildMetadata.source_root.join("lib/bundler/build_metadata.rb"), file
 
-      #{header}
-
-      ### Enhancements:
-    CHANGELOG
+      Spec::BuildMetadata.stub(:git_commit_sha, "abc1234") do
+        yield dir, file
+      end
+    end
   end
 end

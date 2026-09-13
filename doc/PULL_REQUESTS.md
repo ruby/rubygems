@@ -50,25 +50,34 @@ release, make sure the following information is accurate:
 * The PR has an accurate label. If a PR is to be included in the changelog since
   it has user visible changes, the label must be one of the following:
 
-  * "bundler: security fix"
-  * "bundler: breaking change"
-  * "bundler: major enhancement"
-  * "bundler: deprecation"
-  * "bundler: feature"
-  * "bundler: performance"
-  * "bundler: documentation"
-  * "bundler: minor enhancement"
-  * "bundler: bug fix"
+  * "rubygems: feature" / "bundler: feature"
+  * "rubygems: performance" / "bundler: performance"
+  * "rubygems: enhancement" / "bundler: enhancement"
+  * "rubygems: bug fix" / "bundler: bug fix"
+  * "rubygems: security" / "bundler: security"
+  * "rubygems: breaking change" / "bundler: breaking change"
+  * "rubygems: deprecation" / "bundler: deprecation"
+  * "rubygems: documentation" / "bundler: documentation"
 
-  This label will indicate the section in the changelog that the PR will take,
-  and it will also be automatically used by our release tasks for backporting.
+  A PR labelled for both libraries is listed under both, so the two labels do
+  not have to be of the same category. A "skip changelog" label for one library
+  leaves the entry under the other library only.
+
+  Each label indicates the section in the changelog that the PR will take for
+  its library, and the labels are also automatically used by our release tasks
+  for backporting. Two category labels for the same library must map to the
+  same section, or a minor or major release stops. A patch release only looks
+  at the patch level labels, so a label outside that set is ignored there
+  instead of clashing. A "skip changelog" label next to a category label for
+  the same library is allowed, and the category label wins.
   The labels that should be backported only to patch level releases, and to
   either patch level or minor releases can be configured in the `.changelog.yml`
   file.
 
   If for some reason you need a PR to be backported to a stable branch, but it
-  doesn't have any user visible changes, apply the "bundler: skip changelog"
-  label to it so that our release scripts know about that.
+  doesn't have any user visible changes, apply the "rubygems: skip changelog" or
+  "bundler: skip changelog" label to it so that our release scripts know about
+  that.
 
 Finally, don't forget to review the changes in detail. Make sure you try them
 locally if they are not trivial and make sure you request changes and ask as
