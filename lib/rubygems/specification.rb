@@ -872,12 +872,14 @@ class Gem::Specification < Gem::BasicSpecification
     gems_dir = File.join(base_dir, "gems")
 
     each_gemspec([default_dir]) do |path|
-      stub = Gem::StubSpecification.default_gemspec_stub(path, base_dir, gems_dir)
-      if stub.stubbed? && !stub.stubbed_files.equal?(Gem::StubSpecification::StubLine::NO_FILES)
-        Gem.register_default_spec(stub)
-      else
-        spec = load(path)
-        Gem.register_default_spec(spec) if spec
+      # Read the file once, so a gemspec written without the files stub line
+      # costs no more to load than it did before that line existed.
+      code = Gem.open_file(path, Gem::StubSpecification::OPEN_MODE, &:read)
+
+      if (stub_line = Gem::StubSpecification::StubLine.parse(code, files_required: true))
+        Gem.register_default_spec(Gem::StubSpecification.default_gemspec_stub(path, base_dir, gems_dir, stub_line))
+      elsif (spec = load_code(path, code))
+        Gem.register_default_spec(spec)
       end
     end
   end
@@ -1129,6 +1131,10 @@ class Gem::Specification < Gem::BasicSpecification
 
     code = Gem.open_file(file, "r:UTF-8:-", &:read)
 
+    load_code(file, code)
+  end
+
+  def self.load_code(file, code)
     begin
       spec = eval code, binding, file
 
@@ -1154,6 +1160,8 @@ class Gem::Specification < Gem::BasicSpecification
 
     nil
   end
+
+  private_class_method :load_code
 
   ##
   # Specification attributes that must be non-nil

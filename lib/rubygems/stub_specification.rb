@@ -41,6 +41,46 @@ class Gem::StubSpecification < Gem::BasicSpecification
       "lib" => ["lib"].freeze,
     }.freeze
 
+    # +source+ is the gemspec as an IO or a String. Returns nil when it has no
+    # complete stub header, or no files stub line when +files_required+.
+    def self.parse(source, files_required: false)
+      stubline = nil
+      extensions = NO_EXTENSIONS
+      target = NO_TARGET
+      files = NO_FILES
+      lineno = 0
+
+      # Match header lines by prefix, not position, so that one line never
+      # hides another that follows it.
+      source.each_line do |line|
+        lineno += 1
+        next if lineno == 1 # discard encoding line
+
+        if lineno == 2
+          break unless line.start_with?(PREFIX)
+          stubline = line
+        elsif !line.start_with?("# ")
+          break if files_required && files.equal?(NO_FILES)
+          stubline.chomp! # readline(chomp: true) allocates 3x as much as .readline.chomp!
+          return new(stubline, extensions, target, files)
+        elsif line.delete_prefix!(PREFIX)
+          line.chomp!
+          extensions = line.split "\0"
+        elsif line.delete_prefix!(TARGET_PREFIX)
+          line.chomp!
+          target = line.split(",").to_h do |pair|
+            key, value = pair.split("=", 2)
+            [key, value]
+          end
+        elsif line.delete_prefix!(FILES_PREFIX)
+          line.chomp!
+          files = line.split "\0"
+        end
+      end
+
+      nil
+    end
+
     def initialize(data, extensions, target = NO_TARGET, files = NO_FILES)
       parts          = data[PREFIX.length..-1].split(" ", 4)
       @name          = -parts[0]
@@ -71,8 +111,8 @@ class Gem::StubSpecification < Gem::BasicSpecification
     end
   end
 
-  def self.default_gemspec_stub(filename, base_dir, gems_dir)
-    new filename, base_dir, gems_dir, true
+  def self.default_gemspec_stub(filename, base_dir, gems_dir, stub_line = nil)
+    new filename, base_dir, gems_dir, true, stub_line
   end
 
   def self.gemspec_stub(filename, base_dir, gems_dir)
@@ -81,11 +121,11 @@ class Gem::StubSpecification < Gem::BasicSpecification
 
   attr_reader :base_dir, :gems_dir
 
-  def initialize(filename, base_dir, gems_dir, default_gem)
+  def initialize(filename, base_dir, gems_dir, default_gem, stub_line = nil)
     super()
 
     self.loaded_from = filename
-    @data            = nil
+    @data            = stub_line
     @name            = nil
     @spec            = nil
     @base_dir        = base_dir
@@ -120,36 +160,8 @@ class Gem::StubSpecification < Gem::BasicSpecification
       begin
         saved_lineno = $.
 
-        Gem.open_file loaded_from, OPEN_MODE do |file|
-          file.readline # discard encoding line
-          stubline = file.readline
-          if stubline.start_with?(PREFIX)
-            extensions = StubLine::NO_EXTENSIONS
-            target = StubLine::NO_TARGET
-            files = StubLine::NO_FILES
-
-            # Match header lines by prefix, not position, so that one line
-            # never hides another that follows it.
-            while (line = file.readline).start_with?("# ")
-              if line.delete_prefix!(PREFIX)
-                line.chomp!
-                extensions = line.split "\0"
-              elsif line.delete_prefix!(TARGET_PREFIX)
-                line.chomp!
-                target = line.split(",").to_h do |pair|
-                  key, value = pair.split("=", 2)
-                  [key, value]
-                end
-              elsif line.delete_prefix!(FILES_PREFIX)
-                line.chomp!
-                files = line.split "\0"
-              end
-            end
-
-            stubline.chomp! # readline(chomp: true) allocates 3x as much as .readline.chomp!
-            @data = StubLine.new stubline, extensions, target, files
-          end
-        rescue EOFError
+        @data = Gem.open_file loaded_from, OPEN_MODE do |file|
+          StubLine.parse file
         end
       ensure
         $. = saved_lineno

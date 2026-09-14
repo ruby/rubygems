@@ -928,6 +928,29 @@ dependencies: []
     assert_equal false, spec.has_unit_tests?
   end
 
+  def test_self_load_defaults
+    stubbed = util_spec "stubbed", 1 do |s|
+      s.files = %w[lib/stubbed.rb]
+    end
+    evaluated = util_spec "evaluated", 1 do |s|
+      s.files = %w[lib/evaluated.rb]
+    end
+
+    FileUtils.mkdir_p Gem.default_specifications_dir
+    File.binwrite File.join(Gem.default_specifications_dir, stubbed.spec_name), stubbed.to_ruby
+    # As written by a RubyGems that predates the files stub line
+    File.binwrite File.join(Gem.default_specifications_dir, evaluated.spec_name),
+                  evaluated.to_ruby.sub(/^# files: .*\n/, "")
+
+    Gem.clear_default_specs
+    Gem::Specification.load_defaults
+
+    assert_kind_of Gem::StubSpecification, Gem.find_unresolved_default_spec("stubbed.rb")
+    assert_equal "stubbed", Gem.find_unresolved_default_spec("stubbed.rb").name
+    assert_instance_of Gem::Specification, Gem.find_unresolved_default_spec("evaluated.rb")
+    assert_equal "evaluated", Gem.find_unresolved_default_spec("evaluated.rb").name
+  end
+
   def test_self_normalize_yaml_input_with_183_yaml
     input = "!ruby/object:Gem::Specification "
     assert_equal "--- #{input}", Gem::Specification.normalize_yaml_input(input)
