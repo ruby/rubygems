@@ -20,8 +20,7 @@ class Gem::StubSpecification < Gem::BasicSpecification
 
   class StubLine # :nodoc: all
     attr_reader :name, :version, :platform, :require_paths, :extensions,
-                :full_name, :content_address
-    attr_accessor :files
+                :full_name, :content_address, :files
 
     NO_EXTENSIONS = [].freeze
     NO_TARGET = {}.freeze
@@ -42,7 +41,7 @@ class Gem::StubSpecification < Gem::BasicSpecification
       "lib" => ["lib"].freeze,
     }.freeze
 
-    def initialize(data, extensions, target = NO_TARGET)
+    def initialize(data, extensions, target = NO_TARGET, files = NO_FILES)
       parts          = data[PREFIX.length..-1].split(" ", 4)
       @name          = -parts[0]
       @version       = if Gem::Version.correct?(parts[1])
@@ -56,7 +55,7 @@ class Gem::StubSpecification < Gem::BasicSpecification
       @platform = Gem::Platform.new(target_platform || suffix)
       @content_address = suffix if Gem::ContentAddress.content_addressed_row?(suffix, target_platform, validate_ruby_abi: false)
       @extensions    = extensions
-      @files         = NO_FILES
+      @files         = files
       @full_name     = if @content_address
         "#{name}-#{version}-#{content_address}"
       elsif platform == Gem::Platform::RUBY
@@ -125,34 +124,30 @@ class Gem::StubSpecification < Gem::BasicSpecification
           file.readline # discard encoding line
           stubline = file.readline
           if stubline.start_with?(PREFIX)
-            line = file.readline
-
-            if line.delete_prefix!(PREFIX)
-              line.chomp!
-              extensions = line.split "\0"
-              line = file.readline
-            else
-              extensions = StubLine::NO_EXTENSIONS
-            end
-
+            extensions = StubLine::NO_EXTENSIONS
             target = StubLine::NO_TARGET
-            if line.delete_prefix!(TARGET_PREFIX)
-              line.chomp!
-              target = line.split(",").to_h do |pair|
-                key, value = pair.split("=", 2)
-                [key, value]
+            files = StubLine::NO_FILES
+
+            # Match header lines by prefix, not position, so that one line
+            # never hides another that follows it.
+            while (line = file.readline).start_with?("# ")
+              if line.delete_prefix!(PREFIX)
+                line.chomp!
+                extensions = line.split "\0"
+              elsif line.delete_prefix!(TARGET_PREFIX)
+                line.chomp!
+                target = line.split(",").to_h do |pair|
+                  key, value = pair.split("=", 2)
+                  [key, value]
+                end
+              elsif line.delete_prefix!(FILES_PREFIX)
+                line.chomp!
+                files = line.split "\0"
               end
-              line = file.readline
             end
 
             stubline.chomp! # readline(chomp: true) allocates 3x as much as .readline.chomp!
-            @data = StubLine.new stubline, extensions, target
-
-            # Read files stub line if present
-            if line.start_with?(FILES_PREFIX)
-              line.chomp!
-              @data.files = line.byteslice(FILES_PREFIX.bytesize..).split("\0")
-            end
+            @data = StubLine.new stubline, extensions, target, files
           end
         rescue EOFError
         end

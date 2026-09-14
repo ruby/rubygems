@@ -309,6 +309,30 @@ class TestStubSpecification < Gem::TestCase
     assert stub.stubbed?
   end
 
+  def test_initialize_header_lines_in_any_order
+    spec = File.join @gemhome, "specifications", "stub_o-2-ab12345678.gemspec"
+    File.write spec, <<~STUB
+      # -*- encoding: utf-8 -*-
+      # stub: stub_o 2 ab12345678 lib
+      # unknown: value
+      # files: lib/stub_o.rb\0ext/stub_o/extconf.rb
+      # stub-target: platform=x86_64-linux
+      # stub: ext/stub_o/extconf.rb
+
+      Gem::Specification.new do |s|
+        s.name = 'stub_o'
+        s.version = Gem::Version.new '2'
+      end
+    STUB
+
+    stub = Gem::StubSpecification.gemspec_stub spec, @gemhome, File.join(@gemhome, "gems")
+
+    assert_equal Gem::Platform.new("x86_64-linux"), stub.platform
+    assert_equal "ab12345678", stub.content_address
+    assert_equal %w[ext/stub_o/extconf.rb], stub.extensions
+    assert_equal %w[lib/stub_o.rb ext/stub_o/extconf.rb], stub.stubbed_files
+  end
+
   def stub_with_version
     spec = File.join @gemhome, "specifications", "stub_v-with-version.gemspec"
     File.open spec, "w" do |io|
