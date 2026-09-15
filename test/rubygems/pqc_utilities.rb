@@ -53,16 +53,41 @@ module Gem::PQCUtilities
   end
 
   ##
+  # Returns whether the runtime OpenSSL can load an ML-DSA key. A library can
+  # read ML-DSA keys without being able to generate them: AWS-LC parses ML-DSA
+  # keys and certificates, and signs and verifies with them, but registers no
+  # keygen by algorithm name, so support_ml_dsa_key? is false there. Tests that
+  # assert the "no ML-DSA support" path for a key or certificate read from disk
+  # need this instead of support_ml_dsa_key?.
+
+  def self.support_ml_dsa_key_load?
+    return @support_ml_dsa_key_load unless @support_ml_dsa_key_load.nil?
+
+    @support_ml_dsa_key_load =
+      begin
+        !OpenSSL::PKey.read(
+          File.read(File.join(CERTS_DIR, "mldsa65_private_key.pem"))
+        ).nil?
+      # Mirrors Gem::PEMUtilities.load_key, which rescues the same error when an
+      # unsupported key algorithm is read.
+      rescue OpenSSL::PKey::PKeyError
+        false
+      end
+  end
+
+  ##
   # Returns whether the runtime can sign an X.509 certificate with an ML-DSA
-  # key. Ruby OpenSSL rejects the nil digest that needs before 3.3, so
-  # support_ml_dsa_key? alone does not cover certificate building.
+  # key. Ruby OpenSSL rejects the nil digest that ML-DSA needs before 3.3, so
+  # key generation alone does not cover certificate building.
 
   def self.support_ml_dsa_cert?
     return @support_ml_dsa_cert unless @support_ml_dsa_cert.nil?
 
     @support_ml_dsa_cert =
       begin
-        key = OpenSSL::PKey.generate_key("ML-DSA-65")
+        key = OpenSSL::PKey.read(
+          File.read(File.join(CERTS_DIR, "mldsa65_private_key.pem"))
+        )
         cert = OpenSSL::X509::Certificate.new
         cert.subject = cert.issuer = OpenSSL::X509::Name.new([["CN", "probe"]])
         cert.public_key = OpenSSL::PKey.read(key.public_to_pem)
@@ -70,10 +95,9 @@ module Gem::PQCUtilities
         cert.not_after = Time.now + 60
         cert.sign(key, nil)
         true
-      # NoMethodError: JRuby's Ruby OpenSSL lacks generate_key.
       # TypeError: Ruby OpenSSL < 3.3 rejects a nil digest here.
       rescue OpenSSL::PKey::PKeyError, OpenSSL::X509::CertificateError,
-             NoMethodError, TypeError
+             TypeError
         false
       end
   end
