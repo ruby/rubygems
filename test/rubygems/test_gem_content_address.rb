@@ -26,6 +26,13 @@ class TestGemContentAddress < Gem::TestCase
     refute Gem::ContentAddress.match?("ABCDEF12")
   end
 
+  def test_widened
+    refute Gem::ContentAddress.widened?("a" * 8)
+    assert Gem::ContentAddress.widened?("a" * 9)
+    refute Gem::ContentAddress.widened?(nil)
+    refute Gem::ContentAddress.widened?("not-an-address")
+  end
+
   def test_valid_ruby_abi
     assert Gem::ContentAddress.valid_ruby_abi?("3.4")
     assert Gem::ContentAddress.valid_ruby_abi?("10.0")
