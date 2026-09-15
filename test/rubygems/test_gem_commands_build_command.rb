@@ -122,6 +122,36 @@ class TestGemCommandsBuildCommand < Gem::TestCase
     util_test_build_gem @gem
   end
 
+  # Regression test for https://github.com/rubygems/rubygems/issues/9344:
+  # `gem build --platform X` must produce a platform-specific gem even when X
+  # happens to equal the local platform. `Gem::Specification#initialize` infers
+  # the platform from `Gem.platforms.last` but deliberately skips it when that
+  # equals `Gem::Platform.local`, because `Gem.platforms` includes the local
+  # platform by default and every spec would otherwise become platform-specific.
+  # `gem build` relied entirely on that inference, so the one case where the
+  # requested platform matched the local one was silently dropped.
+  def test_execute_with_platform_matching_local_platform
+    gemspec_file = File.join(@tempdir, @gem.spec_name)
+
+    File.open gemspec_file, "w" do |gs|
+      gs.write @gem.to_ruby
+    end
+
+    @cmd.handle_options [gemspec_file, "--platform", Gem::Platform.local.to_s]
+
+    use_ui @ui do
+      Dir.chdir @tempdir do
+        @cmd.execute
+      end
+    end
+
+    gem_file = File.join @tempdir, "some_gem-2-#{Gem::Platform.local}.gem"
+    assert File.exist?(gem_file), "expected a platform-specific gem at #{gem_file}"
+
+    spec = Gem::Package.new(gem_file).spec
+    assert_equal Gem::Platform.local, spec.platform
+  end
+
   def test_ruby_abi_rejects_ruby_platform
     gem = util_spec "some_gem" do |s|
       s.license = "AGPL-3.0-only"

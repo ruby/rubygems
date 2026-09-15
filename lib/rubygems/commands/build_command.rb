@@ -90,6 +90,15 @@ Platform gems can be built for a single Ruby ABI with the --ruby-abi option:
   def build_package(gemspec)
     spec = Gem::Specification.load(gemspec)
     if spec
+      # Gem::Specification#initialize infers the platform from
+      # Gem.platforms.last, but skips it when that equals Gem::Platform.local,
+      # because Gem.platforms includes the local platform by default and every
+      # spec would otherwise become platform specific. Passing --platform
+      # resets Gem.platforms, so the request is unambiguous and is applied here
+      # rather than left to that inference, which would drop it whenever the
+      # requested platform happened to be the local one.
+      spec.platform = Gem.platforms.last if options[:added_platform]
+
       Gem::Package.build(
         spec,
         options[:force],
