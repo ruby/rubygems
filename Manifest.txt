@@ -578,8 +578,6 @@ lib/rubygems/vendor/optparse/lib/optparse/shellwords.rb
 lib/rubygems/vendor/optparse/lib/optparse/time.rb
 lib/rubygems/vendor/optparse/lib/optparse/uri.rb
 lib/rubygems/vendor/optparse/lib/optparse/version.rb
-lib/rubygems/vendor/resolv/COPYING
-lib/rubygems/vendor/resolv/lib/resolv.rb
 lib/rubygems/vendor/securerandom/COPYING
 lib/rubygems/vendor/securerandom/lib/securerandom.rb
 lib/rubygems/vendor/timeout/COPYING
