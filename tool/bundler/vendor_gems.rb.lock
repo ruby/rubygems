@@ -24,7 +24,6 @@ GEM
     net-protocol (0.2.2)
       timeout
     optparse (0.8.0)
-    resolv (0.7.0)
     securerandom (0.4.1)
     thor (1.4.0)
     timeout (0.4.4)
@@ -48,7 +47,6 @@ DEPENDENCIES
   net-protocol (= 0.2.2)
   optparse (= 0.8.0)
   pub_grub!
-  resolv (= 0.7.0)
   securerandom (= 0.4.1)
   thor (= 1.4.0)
   timeout (= 0.4.4)
@@ -64,7 +62,6 @@ CHECKSUMS
   net-protocol (0.2.2) sha256=aa73e0cba6a125369de9837b8d8ef82a61849360eba0521900e2c3713aa162a8
   optparse (0.8.0) sha256=ef6b7fbaf7ec331474f325bc08dd5622e6e1e651007a5341330ee4b08ce734f0
   pub_grub (0.5.0)
-  resolv (0.7.0) sha256=e20ce2c00d1e1d1bd13aa98f52d9b5166509f80f50673084ae54dd26a0b083ad
   securerandom (0.4.1) sha256=cc5193d414a4341b6e225f0cb4446aceca8e50d5e1888743fac16987638ea0b1
   thor (1.4.0) sha256=8763e822ccb0f1d7bee88cde131b19a65606657b847cc7b7b4b82e772bcd8a3d
   timeout (0.4.4) sha256=f0f6f970104b82427cd990680f539b6bbb8b1e55efa913a55c6492935e4e0edb
@@ -72,4 +69,4 @@ CHECKSUMS
   uri (1.1.1) sha256=379fa58d27ffb1387eaada68c749d1426738bd0f654d812fcc07e7568f5c57c6
 
 BUNDLED WITH
-  4.0.20
+  4.0.21
