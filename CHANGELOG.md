@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.0.21 / 2026-09-16
+
+### Enhancements:
+
+* Stop vendoring resolv for two regexps. Pull request [#9877](https://github.com/ruby/rubygems/pull/9877) by Hiroshi SHIBATA
+* Normalize absolute symlink targets during gem extraction. Pull request [#9860](https://github.com/ruby/rubygems/pull/9860) by Hiroshi SHIBATA
+* Installs bundler 4.0.21 as a default gem.
+
 ## 4.0.20 / 2026-09-02
 
 ### Enhancements:

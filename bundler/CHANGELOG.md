@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.0.21 / 2026-09-16
+
+### Enhancements:
+
+* Don't update bundler to a prerelease unless asked for one. Pull request [#9869](https://github.com/ruby/rubygems/pull/9869) by Hiroshi SHIBATA
+* Reject Bundler redirects that downgrade https to http. Pull request [#9859](https://github.com/ruby/rubygems/pull/9859) by Hiroshi SHIBATA
+
+### Bug fixes:
+
+* Support `safe.bareRepository=explicit` in git sources. Pull request [#9876](https://github.com/ruby/rubygems/pull/9876) by Hiroshi SHIBATA
+* Stop resolving locally for empty CHECKSUMS entries. Pull request [#9862](https://github.com/ruby/rubygems/pull/9862) by Hiroshi SHIBATA
+* Expand the git source gemspec path before the chdir. Pull request [#9845](https://github.com/ruby/rubygems/pull/9845) by Hiroshi SHIBATA
+
 ## 4.0.20 / 2026-09-02
 
 ### Enhancements:
