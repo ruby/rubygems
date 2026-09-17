@@ -1,0 +1,151 @@
+bundle-up(1) -- Update gems in the Gemfile to their latest versions
+====================================================================
+
+## SYNOPSIS
+
+`bundle up` <*patterns> [--group=GROUP]
+                         [--local]
+                         [--quiet]
+                         [--gemfile=GEMFILE]
+                         [--patch|--minor|--major]
+                         [--pre]
+                         [--strict]
+                         [--interactive]
+                         [--exact|--tilde|--gte|--lte]
+                         [--version=VERSION]
+                         [--cooldown=NUMBER]
+
+## DESCRIPTION
+
+`bundle up` updates the version requirements of the gems matching the given
+patterns in the [`Gemfile(5)`](https://guides.rubygems.org/gemfile/) to the newest available versions,
+and then installs them. It is the counterpart to
+[bundle update(1)](bundle-update.1.html), which only updates `Gemfile.lock`
+within the requirements already declared in the `Gemfile`.
+
+Patterns support globs matched against the gems declared in the `Gemfile`.
+Quote the pattern to stop your shell from expanding it. A specific version
+or requirement can be requested with `gem@version`, or with `--version`:
+
+* `bundle up rails` updates the `rails` requirement to the latest version.
+* `bundle up rails@8.0.0` sets the `rails` requirement to exactly `8.0.0`.
+* `bundle up 'rake_tasks@> 5.0.0, < 5.1.1'` sets a compound requirement.
+* `bundle up rake_tasks --version='> 5.0.0, < 5.1.1'` does the same for every
+  matched gem.
+* `bundle up "rake*"` updates every declared gem whose name starts with `rake`.
+
+Only gems declared directly in the `Gemfile` can be updated. Transitive
+dependencies are resolved as usual during install. Gems from `git` or `path`
+sources are skipped with a warning, since their versions are not managed
+through version requirements.
+
+## OPTIONS
+
+* `--gemfile=GEMFILE`:
+  Use the specified gemfile instead of [`Gemfile(5)`](https://guides.rubygems.org/gemfile/).
+
+* `--group=<list>`, `-g=<list>`:
+  Only update the gems in the specified group.
+
+* `--local`:
+  Do not attempt to fetch gems remotely and use the gem cache instead.
+
+* `--quiet`:
+  Only output warnings and errors.
+
+* `--patch`:
+  Update only to the newest patch version, for example `1.0.1` to `1.0.2`.
+
+* `--minor`:
+  Update only to the newest minor version, for example `1.0.1` to `1.1.0`.
+
+* `--major`:
+  Update to the newest version, even across major versions (default).
+
+* `--pre`:
+  Always choose the highest allowed version, regardless of prerelease status.
+
+* `--strict`:
+  Do not allow any gem to be updated past latest `--patch` | `--minor` |
+  `--major`. `--patch` and `--minor` already keep the selected gems inside
+  their level; `--strict` extends that to the rest of the resolution, so a
+  transitive dependency cannot move past the level either.
+
+* `--interactive`, `-i`:
+  Confirm each gem update individually.
+
+* `--exact`:
+  Use an exact version requirement when rewriting the Gemfile.
+
+* `--tilde`:
+  Use a pessimistic version requirement when rewriting the Gemfile.
+
+* `--gte`:
+  Use an optimistic version requirement when rewriting the Gemfile.
+
+* `--lte`:
+  Use a ceiling version requirement when rewriting the Gemfile.
+
+* `--version=VERSION`, `-v=VERSION`:
+  Use the given requirement(s) when rewriting the Gemfile. Accepts a single
+  version or requirement (`8.0.0`, `>= 8.0`) as well as a comma separated
+  list (`> 5.0.0, < 5.1.1`). Cannot be combined with `gem@version` pins or
+  with `--exact`, `--tilde`, `--gte` or `--lte`.
+
+* `--cooldown=<number>`:
+  Only consider gem versions published at least <number> days ago when
+  resolving. Pass `0` to disable cooldown for this run, overriding every
+  other cooldown setting, RubyGems' own included. See `cooldown` in
+  bundle-config(1).
+
+## REWRITING REQUIREMENTS
+
+By default, `bundle up` keeps the operator already declared in the `Gemfile`
+(`~> 7.0` becomes `~> 8.0`), and a bare version with no operator stays bare
+(`gem "rails", "8.0.0"` becomes `gem "rails", "8.0.1"`). A declaration with
+no version gets a `~>` requirement. Operators that cannot survive moving
+forward are converted with a warning: `>` becomes `>=`, while `<`, `<=` and
+`!=` become `~>`.
+
+`--patch` and `--minor` only move a gem within its current level, and leave it
+alone when nothing newer exists at that level, instead of promoting it to the
+next level: `bundle up rails --patch` never crosses a minor or major version.
+Pass `--strict` to keep the rest of the resolution inside the level as well,
+matching `bundle update`.
+
+One of `--exact`, `--tilde`, `--gte` or `--lte` overrides this,
+using the latest resolved version:
+
+* `--exact` writes `= VERSION`.
+* `--tilde` writes `~> VERSION`.
+* `--gte` writes `>= VERSION`.
+* `--lte` writes `<= VERSION`.
+
+A `gem@version` pin or `--version` always writes the given requirement(s)
+verbatim: a single version as `= VERSION`, anything else (including comma
+separated compounds like `> 5.0.0, < 5.1.1`) as declared.
+
+If a gem is already at the newest version, the `Gemfile` is left alone —
+unless an operator flag is given, in which case the requirement is still
+rewritten to match the locked version.
+
+## EXAMPLES
+
+1. Update the `rails` requirement to the latest available version:
+
+   `bundle up rails`
+
+2. Pin `rails` to exactly `8.0.0`:
+
+   `bundle up rails@8.0.0`
+
+3. Update every declared gem whose name starts with `rake`, confirming each:
+
+   `bundle up "rake*" --interactive`
+
+## SEE ALSO
+
+[Gemfile(5)](https://guides.rubygems.org/gemfile/),
+[bundle-update(1)](bundle-update.1.html),
+[bundle-outdated(1)](bundle-outdated.1.html),
+[bundle-add(1)](bundle-add.1.html)

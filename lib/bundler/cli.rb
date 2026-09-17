@@ -335,6 +335,36 @@ module Bundler
       end
     end
 
+    desc "up PATTERN [OPTIONS]", "Update gems in the Gemfile to their latest versions"
+    long_desc <<-D
+      Up will update the version requirements of the gems matching the given
+      patterns in the Gemfile to the newest available versions, and then
+      install them. Patterns support globs (e.g. `bundle up "rake*"`), and a
+      specific version can be requested with `bundle up rails@8.0.0`.
+    D
+    method_option "gemfile", type: :string, banner: "Use the specified gemfile instead of Gemfile"
+    method_option "group", aliases: "-g", type: :array, banner: "Update a specific group"
+    method_option "local", type: :boolean, banner: "Do not attempt to fetch gems remotely and use the gem cache instead"
+    method_option "quiet", type: :boolean, banner: "Only output warnings and errors."
+    method_option "patch", type: :boolean, banner: "Update only to the newest patch version"
+    method_option "minor", type: :boolean, banner: "Update only to the newest minor version"
+    method_option "major", type: :boolean, banner: "Update to the newest version (default)"
+    method_option "pre", type: :boolean, banner: "Always choose the highest allowed version when updating gems, regardless of prerelease status"
+    method_option "strict", type: :boolean, banner: "Do not allow any gem to be updated past latest --patch | --minor | --major"
+    method_option "interactive", aliases: "-i", type: :boolean, banner: "Confirm each gem update individually"
+    method_option "exact", type: :boolean, banner: "Use an exact version requirement when rewriting the Gemfile"
+    method_option "tilde", type: :boolean, banner: "Use a pessimistic version requirement when rewriting the Gemfile"
+    method_option "gte", type: :boolean, banner: "Use an optimistic version requirement when rewriting the Gemfile"
+    method_option "lte", type: :boolean, banner: "Use a ceiling version requirement when rewriting the Gemfile"
+    method_option "version", aliases: "-v", type: :string, banner: "Use the given requirement(s) when rewriting the Gemfile"
+    method_option "cooldown", type: :numeric, banner: "Only consider gem versions published at least N days ago. Use 0 to disable."
+    def up(*patterns)
+      require_relative "cli/up"
+      Bundler.settings.temporary(no_install: false) do
+        Up.new(options, patterns).run
+      end
+    end
+
     desc "show GEM [OPTIONS]", "Shows all gems that are part of the bundle, or the path to a given gem"
     long_desc <<-D
       Show lists the names and versions of all gems that are required by your Gemfile.

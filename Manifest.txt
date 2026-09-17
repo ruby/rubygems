@@ -49,6 +49,7 @@ lib/bundler/cli/plugin.rb
 lib/bundler/cli/pristine.rb
 lib/bundler/cli/remove.rb
 lib/bundler/cli/show.rb
+lib/bundler/cli/up.rb
 lib/bundler/cli/update.rb
 lib/bundler/constants.rb
 lib/bundler/current_ruby.rb
@@ -141,6 +142,8 @@ lib/bundler/man/bundle-remove.1
 lib/bundler/man/bundle-remove.1.ronn
 lib/bundler/man/bundle-show.1
 lib/bundler/man/bundle-show.1.ronn
+lib/bundler/man/bundle-up.1
+lib/bundler/man/bundle-up.1.ronn
 lib/bundler/man/bundle-update.1
 lib/bundler/man/bundle-update.1.ronn
 lib/bundler/man/bundle-version.1

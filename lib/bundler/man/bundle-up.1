@@ -1,0 +1,108 @@
+.\" generated with Ronn-NG/v0.10.1
+.\" http://github.com/apjanke/ronn-ng/tree/0.10.1
+.TH "BUNDLE\-UP" "1" "May 2026" ""
+.SH "NAME"
+\fBbundle\-up\fR \- Update gems in the Gemfile to their latest versions
+.SH "SYNOPSIS"
+\fBbundle up\fR \fI*patterns\fR [\-\-group=GROUP] [\-\-local] [\-\-quiet] [\-\-gemfile=GEMFILE] [\-\-patch|\-\-minor|\-\-major] [\-\-pre] [\-\-strict] [\-\-interactive] [\-\-exact|\-\-tilde|\-\-gte|\-\-lte] [\-\-version=VERSION] [\-\-cooldown=NUMBER]
+.SH "DESCRIPTION"
+\fBbundle up\fR updates the version requirements of the gems matching the given patterns in the \fBGemfile(5)\fR \fIhttps://guides\.rubygems\.org/gemfile/\fR to the newest available versions, and then installs them\. It is the counterpart to bundle update(1) \fIbundle\-update\.1\.html\fR, which only updates \fBGemfile\.lock\fR within the requirements already declared in the \fBGemfile\fR\.
+.P
+Patterns support globs matched against the gems declared in the \fBGemfile\fR\. Quote the pattern to stop your shell from expanding it\. A specific version or requirement can be requested with \fBgem@version\fR, or with \fB\-\-version\fR:
+.IP "\(bu" 4
+\fBbundle up rails\fR updates the \fBrails\fR requirement to the latest version\.
+.IP "\(bu" 4
+\fBbundle up rails@8\.0\.0\fR sets the \fBrails\fR requirement to exactly \fB8\.0\.0\fR\.
+.IP "\(bu" 4
+\fBbundle up 'rake_tasks@> 5\.0\.0, < 5\.1\.1'\fR sets a compound requirement\.
+.IP "\(bu" 4
+\fBbundle up rake_tasks \-\-version='> 5\.0\.0, < 5\.1\.1'\fR does the same for every matched gem\.
+.IP "\(bu" 4
+\fBbundle up "rake*"\fR updates every declared gem whose name starts with \fBrake\fR\.
+.IP "" 0
+.P
+Only gems declared directly in the \fBGemfile\fR can be updated\. Transitive dependencies are resolved as usual during install\. Gems from \fBgit\fR or \fBpath\fR sources are skipped with a warning, since their versions are not managed through version requirements\.
+.SH "OPTIONS"
+.TP
+\fB\-\-gemfile=GEMFILE\fR
+Use the specified gemfile instead of \fBGemfile(5)\fR \fIhttps://guides\.rubygems\.org/gemfile/\fR\.
+.TP
+\fB\-\-group=<list>\fR, \fB\-g=<list>\fR
+Only update the gems in the specified group\.
+.TP
+\fB\-\-local\fR
+Do not attempt to fetch gems remotely and use the gem cache instead\.
+.TP
+\fB\-\-quiet\fR
+Only output warnings and errors\.
+.TP
+\fB\-\-patch\fR
+Update only to the newest patch version, for example \fB1\.0\.1\fR to \fB1\.0\.2\fR\.
+.TP
+\fB\-\-minor\fR
+Update only to the newest minor version, for example \fB1\.0\.1\fR to \fB1\.1\.0\fR\.
+.TP
+\fB\-\-major\fR
+Update to the newest version, even across major versions (default)\.
+.TP
+\fB\-\-pre\fR
+Always choose the highest allowed version, regardless of prerelease status\.
+.TP
+\fB\-\-strict\fR
+Do not allow any gem to be updated past latest \fB\-\-patch\fR | \fB\-\-minor\fR | \fB\-\-major\fR\. \fB\-\-patch\fR and \fB\-\-minor\fR already keep the selected gems inside their level; \fB\-\-strict\fR extends that to the rest of the resolution, so a transitive dependency cannot move past the level either\.
+.TP
+\fB\-\-interactive\fR, \fB\-i\fR
+Confirm each gem update individually\.
+.TP
+\fB\-\-exact\fR
+Use an exact version requirement when rewriting the Gemfile\.
+.TP
+\fB\-\-tilde\fR
+Use a pessimistic version requirement when rewriting the Gemfile\.
+.TP
+\fB\-\-gte\fR
+Use an optimistic version requirement when rewriting the Gemfile\.
+.TP
+\fB\-\-lte\fR
+Use a ceiling version requirement when rewriting the Gemfile\.
+.TP
+\fB\-\-version=VERSION\fR, \fB\-v=VERSION\fR
+Use the given requirement(s) when rewriting the Gemfile\. Accepts a single version or requirement (\fB8\.0\.0\fR, \fB>= 8\.0\fR) as well as a comma separated list (\fB> 5\.0\.0, < 5\.1\.1\fR)\. Cannot be combined with \fBgem@version\fR pins or with \fB\-\-exact\fR, \fB\-\-tilde\fR, \fB\-\-gte\fR or \fB\-\-lte\fR\.
+.TP
+\fB\-\-cooldown=<number>\fR
+Only consider gem versions published at least \fInumber\fR days ago when resolving\. Pass \fB0\fR to disable cooldown for this run, overriding every other cooldown setting, RubyGems' own included\. See \fBcooldown\fR in bundle\-config(1)\.
+.SH "REWRITING REQUIREMENTS"
+By default, \fBbundle up\fR keeps the operator already declared in the \fBGemfile\fR (\fB~> 7\.0\fR becomes \fB~> 8\.0\fR), and a bare version with no operator stays bare (\fBgem "rails", "8\.0\.0"\fR becomes \fBgem "rails", "8\.0\.1"\fR)\. A declaration with no version gets a \fB~>\fR requirement\. Operators that cannot survive moving forward are converted with a warning: \fB>\fR becomes \fB>=\fR, while \fB<\fR, \fB<=\fR and \fB!=\fR become \fB~>\fR\.
+.P
+\fB\-\-patch\fR and \fB\-\-minor\fR only move a gem within its current level, and leave it alone when nothing newer exists at that level, instead of promoting it to the next level: \fBbundle up rails \-\-patch\fR never crosses a minor or major version\. Pass \fB\-\-strict\fR to keep the rest of the resolution inside the level as well, matching \fBbundle update\fR\.
+.P
+One of \fB\-\-exact\fR, \fB\-\-tilde\fR, \fB\-\-gte\fR or \fB\-\-lte\fR overrides this, using the latest resolved version:
+.IP "\(bu" 4
+\fB\-\-exact\fR writes \fB= VERSION\fR\.
+.IP "\(bu" 4
+\fB\-\-tilde\fR writes \fB~> VERSION\fR\.
+.IP "\(bu" 4
+\fB\-\-gte\fR writes \fB>= VERSION\fR\.
+.IP "\(bu" 4
+\fB\-\-lte\fR writes \fB<= VERSION\fR\.
+.IP "" 0
+.P
+A \fBgem@version\fR pin or \fB\-\-version\fR always writes the given requirement(s) verbatim: a single version as \fB= VERSION\fR, anything else (including comma separated compounds like \fB> 5\.0\.0, < 5\.1\.1\fR) as declared\.
+.P
+If a gem is already at the newest version, the \fBGemfile\fR is left alone \(em unless an operator flag is given, in which case the requirement is still rewritten to match the locked version\.
+.SH "EXAMPLES"
+.IP "1." 4
+Update the \fBrails\fR requirement to the latest available version:
+.IP
+\fBbundle up rails\fR
+.IP "2." 4
+Pin \fBrails\fR to exactly \fB8\.0\.0\fR:
+.IP
+\fBbundle up rails@8\.0\.0\fR
+.IP "3." 4
+Update every declared gem whose name starts with \fBrake\fR, confirming each:
+.IP
+\fBbundle up "rake*" \-\-interactive\fR
+.IP "" 0
+.SH "SEE ALSO"
+Gemfile(5) \fIhttps://guides\.rubygems\.org/gemfile/\fR, bundle\-update(1) \fIbundle\-update\.1\.html\fR, bundle\-outdated(1) \fIbundle\-outdated\.1\.html\fR, bundle\-add(1) \fIbundle\-add\.1\.html\fR
