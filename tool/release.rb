@@ -3,6 +3,13 @@
 require_relative "changelog"
 
 class Release
+  # Octokit guesses an asset's content type through the mime-types gem, which
+  # the release bundle does not carry, so each type is spelled out here.
+  RELEASE_ASSET_CONTENT_TYPES = {
+    "tgz" => "application/gzip",
+    "zip" => "application/zip",
+  }.freeze
+
   module GithubAPI
     def gh_client
       @gh_client ||= begin
@@ -381,7 +388,11 @@ class Release
     }
     options[:target_commitish] = @stable_branch unless @prerelease
 
-    gh_client.create_release "ruby/rubygems", tag, **options
+    release = gh_client.create_release "ruby/rubygems", tag, **options
+
+    RELEASE_ASSET_CONTENT_TYPES.each do |ext, content_type|
+      gh_client.upload_asset(release.url, "pkg/rubygems-#{@rubygems.version}.#{ext}", content_type: content_type)
+    end
   end
 
   private
