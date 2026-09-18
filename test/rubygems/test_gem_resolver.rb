@@ -336,6 +336,108 @@ class TestGemResolver < Gem::TestCase
     assert_resolves_to [ca_spec], resolver
   end
 
+  def test_prefers_remote_gem_with_widened_address_when_first_8_chars_match
+    current_abi = Gem.ruby_abi
+    util_pin_ruby_to_abi current_abi
+    installed_set = Gem::Resolver::CurrentSet.new
+    ca_spec = util_spec "a", "1"
+    ca_spec.platform = Gem::Platform.local
+    ca_spec.content_address = "ab123456"
+    ca_spec.required_ruby_version = "~> #{current_abi}.0"
+    ca_installed_spec = Gem::Resolver::InstalledSpecification.new installed_set, ca_spec
+
+    # Add another installed spec for a different platform
+    # to confirm that this gem is preserved and not accidentally replaced by a widened remote spec.
+    other_platform_spec = util_spec "a", "1"
+    other_platform_spec.platform = "arm64-darwin"
+    other_platform_spec.content_address = "ab123456"
+    other_platform_spec.required_ruby_version = "~> #{current_abi}.0"
+    other_platform_installed_spec = Gem::Resolver::InstalledSpecification.new installed_set, other_platform_spec
+
+    api_set = Gem::Resolver::APISet.new
+    data = {
+      name: "a",
+      number: "1",
+      suffix: "ab1234567890",
+      dependencies: [],
+      requirements: { platform: [Gem::Platform.local.to_s], ruby: ["~> #{current_abi}.0"] },
+    }
+    widened_api_spec = Gem::Resolver::APISpecification.new api_set, data
+
+    s = StaticSet.new([ca_installed_spec, other_platform_installed_spec, widened_api_spec])
+    dependency = make_dep "a"
+    resolver = Gem::Resolver.new([dependency], s)
+    resolved_spec = resolver.resolve.first.spec
+
+    assert_same widened_api_spec, resolved_spec
+    assert_equal "ab1234567890", resolved_spec.content_address
+  ensure
+    util_restore_RUBY_VERSION
+  end
+
+  def test_does_not_replace_installed_gem_with_widened_address_for_different_ruby_abi
+    current_abi = Gem.ruby_abi
+    util_pin_ruby_to_abi current_abi
+    other_abi = current_abi == "2.7" ? "3.0" : "2.7"
+    installed_set = Gem::Resolver::CurrentSet.new
+    ca_spec = util_spec "a", "1"
+    ca_spec.platform = Gem::Platform.local
+    ca_spec.content_address = "ab123456"
+    ca_spec.required_ruby_version = "~> #{current_abi}.0"
+    ca_installed_spec = Gem::Resolver::InstalledSpecification.new installed_set, ca_spec
+
+    api_set = Gem::Resolver::APISet.new
+    data = {
+      name: "a",
+      number: "1",
+      suffix: "ab1234567890",
+      dependencies: [],
+      requirements: { platform: [Gem::Platform.local.to_s], ruby: ["~> #{other_abi}.0"] },
+    }
+    widened_api_spec = Gem::Resolver::APISpecification.new api_set, data
+
+    s = StaticSet.new([ca_installed_spec, widened_api_spec])
+    dependency = make_dep "a"
+    resolver = Gem::Resolver.new([dependency], s)
+    resolver.soft_missing = true
+    resolved_spec = resolver.resolve.first.spec
+
+    assert_same ca_installed_spec, resolved_spec
+  ensure
+    util_restore_RUBY_VERSION
+  end
+
+  def test_does_not_replace_installed_gem_with_widened_address_for_different_platform
+    util_set_arch "arm64-darwin-27"
+    current_abi = Gem.ruby_abi
+    util_pin_ruby_to_abi current_abi
+    installed_set = Gem::Resolver::CurrentSet.new
+    ca_spec = util_spec "a", "1"
+    ca_spec.platform = Gem::Platform.local
+    ca_spec.content_address = "ab123456"
+    ca_spec.required_ruby_version = "~> #{current_abi}.0"
+    ca_installed_spec = Gem::Resolver::InstalledSpecification.new installed_set, ca_spec
+
+    api_set = Gem::Resolver::APISet.new
+    data = {
+      name: "a",
+      number: "1",
+      suffix: "ab1234567890",
+      dependencies: [],
+      requirements: { platform: ["= arm64-darwin"], ruby: ["~> #{current_abi}.0"] },
+    }
+    widened_api_spec = Gem::Resolver::APISpecification.new api_set, data
+
+    s = StaticSet.new([ca_installed_spec, widened_api_spec])
+    dependency = make_dep "a"
+    resolver = Gem::Resolver.new([dependency], s)
+    resolved_spec = resolver.resolve.first.spec
+
+    assert_same ca_installed_spec, resolved_spec
+  ensure
+    util_restore_RUBY_VERSION
+  end
+
   def test_prefers_compatible_content_addressed_gem_over_more_specific_platform
     util_set_arch "arm64-darwin-27"
     current_abi = Gem.ruby_abi
