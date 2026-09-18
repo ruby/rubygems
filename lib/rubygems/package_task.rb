@@ -66,6 +66,10 @@ class Gem::PackageTask < Rake::PackageTask
   attr_accessor :gem_spec
 
   ##
+  # Ruby ABI used when building a content-addressable gem.
+  attr_accessor :ruby_abi
+
+  ##
   # Create a Gem Package task library.  Automatically define the gem if a
   # block is given.  If no block is supplied, then #define needs to be called
   # to define the task.
@@ -95,7 +99,14 @@ class Gem::PackageTask < Rake::PackageTask
 
     gem_file = File.basename gem_spec.cache_file
     gem_path = File.join package_dir, gem_file
-    gem_dir  = File.join package_dir, gem_spec.full_name
+
+    build_target =
+      if ruby_abi
+        File.join(package_dir, "#{gem_spec.full_name}-#{ruby_abi}.gem-built")
+      else
+        gem_path
+      end
+    gem_dir = File.join package_dir, gem_spec.full_name
 
     task package: [:gem]
 
@@ -103,18 +114,25 @@ class Gem::PackageTask < Rake::PackageTask
     directory gem_dir
 
     desc "Build the gem file #{gem_file}"
-    task gem: [gem_path]
+    task gem: [build_target]
 
     trace = Rake.application.options.trace
     Gem.configuration.verbose = trace
 
-    file gem_path => [package_dir, gem_dir] + @gem_spec.files do
+    file build_target => [package_dir, gem_dir] + @gem_spec.files do
       chdir(gem_dir) do
         when_writing "Creating #{gem_spec.file_name}" do
-          built_gem_file = Gem::Package.build gem_spec
+          built_gem_file = Gem::Package.build gem_spec, false, false, nil, ruby_abi
 
           verbose trace do
             mv built_gem_file, ".."
+          end
+
+          if ruby_abi
+            File.write(
+              File.join("..", File.basename(build_target)),
+              File.join(package_dir, built_gem_file)
+            )
           end
         end
       end
