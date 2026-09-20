@@ -71,6 +71,7 @@ class Gem::Licenses
     BSD-2-Clause-Views
     BSD-2-Clause-first-lines
     BSD-2-Clause-pkgconf-disclaimer
+    BSD-2-Clause-pos-unchanged
     BSD-3-Clause
     BSD-3-Clause-Attribution
     BSD-3-Clause-Clear
@@ -82,6 +83,7 @@ class Gem::Licenses
     BSD-3-Clause-No-Nuclear-License-2014
     BSD-3-Clause-No-Nuclear-Warranty
     BSD-3-Clause-Open-MPI
+    BSD-3-Clause-OpenWebUI
     BSD-3-Clause-Sun
     BSD-3-Clause-Tso
     BSD-3-Clause-acpica
@@ -97,9 +99,12 @@ class Gem::Licenses
     BSD-Mark-Modifications
     BSD-Protection
     BSD-Source-Code
+    BSD-Source-Code-no-disclaimer
+    BSD-Source-alt-GPL
     BSD-Source-beginning-file
     BSD-Systemics
     BSD-Systemics-W3Works
+    BSD-ask-to-endorse
     BSL-1.0
     BUSL-1.1
     Baekmuk
@@ -116,7 +121,9 @@ class Gem::Licenses
     Borceux
     Brian-Gladman-2-Clause
     Brian-Gladman-3-Clause
+    Brian-Gladman-3-Clause-no-conversion
     Buddy
+    Bugroff
     C-UDA-1.0
     CAL-1.0
     CAL-1.0-Combined-Work-Exception
@@ -139,6 +146,7 @@ class Gem::Licenses
     CC-BY-NC-2.5
     CC-BY-NC-3.0
     CC-BY-NC-3.0-DE
+    CC-BY-NC-3.0-IGO
     CC-BY-NC-4.0
     CC-BY-NC-ND-1.0
     CC-BY-NC-ND-2.0
@@ -251,6 +259,7 @@ class Gem::Licenses
     Eurosym
     FBM
     FDK-AAC
+    FDK-MPEG-H
     FSFAP
     FSFAP-no-warranty-disclaimer
     FSFUL
@@ -333,6 +342,7 @@ class Gem::Licenses
     HTMLTIDY
     HaskellReport
     Hippocratic-2.1
+    Hippocratic-3.0-core
     IBM-pibs
     ICU
     IEC-Code-Components-EULA
@@ -346,6 +356,7 @@ class Gem::Licenses
     ImageMagick
     Imlib2
     Info-ZIP
+    Informatica
     Inner-Net-2.0
     InnoSetup
     Intel
@@ -419,6 +430,7 @@ class Gem::Licenses
     MS-PL
     MS-RL
     MTLL
+    MVT-1.1
     Mackerras-3-Clause
     Mackerras-3-Clause-acknowledgment
     MakeIndex
@@ -652,6 +664,7 @@ class Gem::Licenses
     Zlib
     any-OSI
     any-OSI-perl-modules
+    atc-game
     bcrypt-Solar-Designer
     blessing
     bzip2-1.0.6
@@ -782,6 +795,7 @@ class Gem::Licenses
     GStreamer-exception-2005
     GStreamer-exception-2008
     Gmsh-exception
+    Google-Patent-WebM
     Independent-modules-exception
     KiCad-libraries-exception
     LGPL-3.0-linking-exception
@@ -805,6 +819,7 @@ class Gem::Licenses
     SHL-2.1
     SWI-exception
     Simple-Library-Usage-exception
+    Spelling-Provider-LGPL-exception
     Swift-exception
     Texinfo-exception
     UBDL-exception
