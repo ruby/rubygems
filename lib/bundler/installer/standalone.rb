@@ -75,12 +75,14 @@ module Bundler
 
     def define_path_helpers
       <<~'END'
-        unless defined?(Gem)
-          module Gem
+        module Gem
+          unless respond_to?(:ruby_api_version)
             def self.ruby_api_version
               RbConfig::CONFIG["ruby_version"]
             end
+          end
 
+          unless respond_to?(:extension_api_version)
             def self.extension_api_version
               if 'no' == RbConfig::CONFIG['ENABLE_SHARED']
                 "#{ruby_api_version}-static"
