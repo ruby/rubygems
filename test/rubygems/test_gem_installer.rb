@@ -545,6 +545,40 @@ class TestGemInstaller < Gem::InstallerTestCase
                  "real executable overwritten")
   end
 
+  def test_no_wrap_non_ruby_executables
+    skip "Symlinks not supported or not enabled" unless symlink_supported?
+
+    installer = setup_base_installer
+
+    installer.wrappers = true
+    util_make_exec @spec, "#!/usr/bin/env bash"
+    installer.gem_dir = @spec.gem_dir
+
+    installer.generate_bin
+    assert_directory_exists util_inst_bindir
+    installed_exec = File.join util_inst_bindir, 'executable'
+    assert_equal true, File.symlink?(installed_exec)
+    assert_equal(File.join(@spec.gem_dir, 'bin', 'executable'),
+                 File.readlink(installed_exec))
+  end
+
+  def test_no_wrap_explicit_rubygems_no_wrap
+    skip "Symlinks not supported or not enabled" unless symlink_supported?
+
+    installer = setup_base_installer
+
+    installer.wrappers = true
+    util_make_exec @spec, ":: rubygems: no-wrap" # a batch file would likely look like this
+    installer.gem_dir = @spec.gem_dir
+
+    installer.generate_bin
+    assert_directory_exists util_inst_bindir
+    installed_exec = File.join util_inst_bindir, 'executable'
+    assert_equal true, File.symlink?(installed_exec)
+    assert_equal(File.join(@spec.gem_dir, 'bin', 'executable'),
+                 File.readlink(installed_exec))
+  end
+
   def test_generate_bin_symlink
     pend "Symlinks not supported or not enabled" unless symlink_supported?
 
