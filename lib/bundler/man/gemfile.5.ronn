@@ -55,6 +55,33 @@ include the credentials in the Gemfile as part of the source URL.
 Credentials in the source URL will take precedence over credentials set using
 `config`.
 
+### OVERRIDES
+
+A `source` may declare one or more `overrides`. An override is a secondary
+RubyGems-compatible repository that supplies alternate builds (for example,
+prebuilt binaries) of gems that already exist in the primary source.
+
+    source "https://rubygems.org",
+           overrides: ["https://build-farm.example.com"]
+
+Overrides are consulted only for gems that are also present in the primary
+source — they cannot introduce new gems. If an override publishes a gem that
+the primary source does not contain in any version, Bundler raises an error,
+since this indicates the override and primary source are misconfigured.
+
+When an override publishes a spec whose name and version match one in the
+primary source, that spec is preferred for installation if it is compatible
+with the local platform. If no matching build is available, or fetching the
+override fails (authentication, SSL, network), Bundler falls back to the
+primary source.
+
+Overrides are recorded in `Gemfile.lock` under `override:` lines:
+
+    GEM
+      remote: https://rubygems.org/
+      override: https://build-farm.example.com/
+      specs:
+
 ## RUBY
 
 If your application requires a specific Ruby version or engine, specify your
