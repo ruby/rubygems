@@ -13,14 +13,18 @@ class Gem::StubSpecification < Gem::BasicSpecification
   TARGET_PREFIX = "# stub-target: "
 
   # :nodoc:
+  FILES_PREFIX = "# files: "
+
+  # :nodoc:
   OPEN_MODE = "r:UTF-8:-"
 
   class StubLine # :nodoc: all
     attr_reader :name, :version, :platform, :require_paths, :extensions,
-                :full_name, :content_address
+                :full_name, :content_address, :files
 
     NO_EXTENSIONS = [].freeze
     NO_TARGET = {}.freeze
+    NO_FILES = [].freeze
 
     # These are common require paths.
     REQUIRE_PATHS = { # :nodoc:
@@ -37,7 +41,47 @@ class Gem::StubSpecification < Gem::BasicSpecification
       "lib" => ["lib"].freeze,
     }.freeze
 
-    def initialize(data, extensions, target = NO_TARGET)
+    # +source+ is the gemspec as an IO or a String. Returns nil when it has no
+    # complete stub header, or no files stub line when +files_required+.
+    def self.parse(source, files_required: false)
+      stubline = nil
+      extensions = NO_EXTENSIONS
+      target = NO_TARGET
+      files = NO_FILES
+      lineno = 0
+
+      # Match header lines by prefix, not position, so that one line never
+      # hides another that follows it.
+      source.each_line do |line|
+        lineno += 1
+        next if lineno == 1 # discard encoding line
+
+        if lineno == 2
+          break unless line.start_with?(PREFIX)
+          stubline = line
+        elsif !line.start_with?("# ")
+          break if files_required && files.equal?(NO_FILES)
+          stubline.chomp! # readline(chomp: true) allocates 3x as much as .readline.chomp!
+          return new(stubline, extensions, target, files)
+        elsif line.delete_prefix!(PREFIX)
+          line.chomp!
+          extensions = line.split "\0"
+        elsif line.delete_prefix!(TARGET_PREFIX)
+          line.chomp!
+          target = line.split(",").to_h do |pair|
+            key, value = pair.split("=", 2)
+            [key, value]
+          end
+        elsif line.delete_prefix!(FILES_PREFIX)
+          line.chomp!
+          files = line.split "\0"
+        end
+      end
+
+      nil
+    end
+
+    def initialize(data, extensions, target = NO_TARGET, files = NO_FILES)
       parts          = data[PREFIX.length..-1].split(" ", 4)
       @name          = -parts[0]
       @version       = if Gem::Version.correct?(parts[1])
@@ -51,6 +95,7 @@ class Gem::StubSpecification < Gem::BasicSpecification
       @platform = Gem::Platform.new(target_platform || suffix)
       @content_address = suffix if Gem::ContentAddress.content_addressed_row?(suffix, target_platform, validate_ruby_abi: false)
       @extensions    = extensions
+      @files         = files
       @full_name     = if @content_address
         "#{name}-#{version}-#{content_address}"
       elsif platform == Gem::Platform::RUBY
@@ -66,8 +111,8 @@ class Gem::StubSpecification < Gem::BasicSpecification
     end
   end
 
-  def self.default_gemspec_stub(filename, base_dir, gems_dir)
-    new filename, base_dir, gems_dir, true
+  def self.default_gemspec_stub(filename, base_dir, gems_dir, stub_line = nil)
+    new filename, base_dir, gems_dir, true, stub_line
   end
 
   def self.gemspec_stub(filename, base_dir, gems_dir)
@@ -76,11 +121,11 @@ class Gem::StubSpecification < Gem::BasicSpecification
 
   attr_reader :base_dir, :gems_dir
 
-  def initialize(filename, base_dir, gems_dir, default_gem)
+  def initialize(filename, base_dir, gems_dir, default_gem, stub_line = nil)
     super()
 
     self.loaded_from = filename
-    @data            = nil
+    @data            = stub_line
     @name            = nil
     @spec            = nil
     @base_dir        = base_dir
@@ -115,33 +160,8 @@ class Gem::StubSpecification < Gem::BasicSpecification
       begin
         saved_lineno = $.
 
-        Gem.open_file loaded_from, OPEN_MODE do |file|
-          file.readline # discard encoding line
-          stubline = file.readline
-          if stubline.start_with?(PREFIX)
-            line = file.readline
-
-            if line.delete_prefix!(PREFIX)
-              line.chomp!
-              extensions = line.split "\0"
-              line = file.readline
-            else
-              extensions = StubLine::NO_EXTENSIONS
-            end
-
-            target = StubLine::NO_TARGET
-            if line.delete_prefix!(TARGET_PREFIX)
-              line.chomp!
-              target = line.split(",").to_h do |pair|
-                key, value = pair.split("=", 2)
-                [key, value]
-              end
-            end
-
-            stubline.chomp! # readline(chomp: true) allocates 3x as much as .readline.chomp!
-            @data = StubLine.new stubline, extensions, target
-          end
-        rescue EOFError
+        @data = Gem.open_file loaded_from, OPEN_MODE do |file|
+          StubLine.parse file
         end
       ensure
         $. = saved_lineno
@@ -155,6 +175,31 @@ class Gem::StubSpecification < Gem::BasicSpecification
 
   def raw_require_paths # :nodoc:
     data.require_paths
+  end
+
+  ##
+  # Files recorded in the files stub line, without loading the full
+  # specification. Returns StubLine::NO_FILES when the gemspec has no files
+  # stub line.
+
+  def stubbed_files
+    data.files
+  end
+
+  ##
+  # Files in the gem, from the files stub line if available,
+  # otherwise from the full specification.
+
+  def files
+    stubbed = stubbed_files
+    stubbed.equal?(StubLine::NO_FILES) ? to_spec.files : stubbed
+  end
+
+  ##
+  # Activate this spec, loading the full specification if needed.
+
+  def activate
+    to_spec.activate
   end
 
   def missing_extensions?

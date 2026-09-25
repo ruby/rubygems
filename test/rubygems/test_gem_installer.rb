@@ -3123,6 +3123,27 @@ class TestGemInstaller < Gem::InstallerTestCase
     assert_equal @spec.version, loaded.version
   end
 
+  def test_write_default_spec_includes_files_stub
+    @spec = setup_base_spec
+    @spec.files = %w[lib/a.rb lib/b.rb]
+
+    installer = Gem::Installer.for_spec @spec
+    installer.gem_home = @gemhome
+
+    installer.write_default_spec
+
+    stub = Gem::StubSpecification.default_gemspec_stub(
+      installer.default_spec_file,
+      @gemhome,
+      File.join(@gemhome, "gems")
+    )
+
+    assert stub.stubbed?
+    assert_includes stub.files, "lib/a.rb"
+    assert_includes stub.files, "lib/b.rb"
+    assert_equal @spec.name, stub.name
+  end
+
   def test_dir
     installer = setup_base_installer
 
