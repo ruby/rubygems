@@ -100,6 +100,11 @@ class Gem::DependencyInstaller
     @cooldown = Gem::Cooldown.from_options options
     @cooldown_skipped = []
 
+    # Sources explicitly requested via `--source`. When present, the gems named
+    # on the command line must be found in one of these sources instead of
+    # silently falling back to the default sources.
+    @explicit_sources = options[:sources]
+
     # Indicates that we should not try to update any deps unless
     # we absolutely must.
     @minimal_deps = options[:minimal_deps]
@@ -224,6 +229,7 @@ class Gem::DependencyInstaller
     installer_set = Gem::Resolver::InstallerSet.new @domain
     installer_set.ignore_installed = (@minimal_deps == false) || @only_install_dir
     installer_set.force = @force
+    installer_set.explicit_sources = @explicit_sources
 
     if consider_local?
       if dep_or_name =~ /\.gem$/ && File.file?(dep_or_name)
