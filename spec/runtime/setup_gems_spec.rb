@@ -792,6 +792,29 @@ RSpec.describe "Bundler.setup" do
     expect(out).to include("Installing myrack 1.0.0")
   end
 
+  it "performs an automatic bundle install of a default gem locked to another version" do
+    build_repo4 do
+      build_gem "psych", "999"
+      build_gem "myrack", "1.0.0"
+    end
+
+    gemfile <<-G
+      source "https://gem.repo4"
+      gem "psych"
+      gem "myrack"
+    G
+
+    bundle_config "auto_install 1"
+
+    ruby <<-RUBY, artifice: "compact_index"
+      require 'bundler/setup'
+      puts Gem.loaded_specs["psych"].version
+    RUBY
+    expect(err).to be_empty
+    expect(out).to include("Installing psych 999")
+    expect(out).to include("999")
+  end
+
   context "in a read-only filesystem" do
     before do
       gemfile <<-G
