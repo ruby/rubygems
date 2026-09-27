@@ -343,7 +343,8 @@ RSpec.describe "bundle update" do
 
     it "the --source flag updates version of gems that were originally pulled in by the source" do
       spec_lines = lib_path("bar/foo.gemspec").read.split("\n")
-      spec_lines[5] = "s.version = '2.0'"
+      version_line = spec_lines.index {|l| l.include?("s.version") }
+      spec_lines[version_line] = "s.version = '2.0'"
 
       update_git "foo", "2.0", path: @git.path do |s|
         s.write "foo.gemspec", spec_lines.join("\n")

@@ -867,10 +867,20 @@ class Gem::Specification < Gem::BasicSpecification
   # Loads the default specifications. It should be called only once.
 
   def self.load_defaults
-    each_spec([Gem.default_specifications_dir]) do |spec|
-      # #load returns nil if the spec is bad, so we just ignore
-      # it at this stage
-      Gem.register_default_spec(spec)
+    default_dir = Gem.default_specifications_dir
+    base_dir = Gem.default_dir
+    gems_dir = File.join(base_dir, "gems")
+
+    each_gemspec([default_dir]) do |path|
+      # Read the file once, so a gemspec written without the files stub line
+      # costs no more to load than it did before that line existed.
+      code = Gem.open_file(path, Gem::StubSpecification::OPEN_MODE, &:read)
+
+      if (stub_line = Gem::StubSpecification::StubLine.parse(code, files_required: true))
+        Gem.register_default_spec(Gem::StubSpecification.default_gemspec_stub(path, base_dir, gems_dir, stub_line))
+      elsif (spec = load_code(path, code))
+        Gem.register_default_spec(spec)
+      end
     end
   end
 
@@ -1121,6 +1131,10 @@ class Gem::Specification < Gem::BasicSpecification
 
     code = Gem.open_file(file, "r:UTF-8:-", &:read)
 
+    load_code(file, code)
+  end
+
+  def self.load_code(file, code)
     begin
       spec = eval code, binding, file
 
@@ -1146,6 +1160,8 @@ class Gem::Specification < Gem::BasicSpecification
 
     nil
   end
+
+  private_class_method :load_code
 
   ##
   # Specification attributes that must be non-nil
@@ -2420,6 +2436,12 @@ class Gem::Specification < Gem::BasicSpecification
     result << "#{Gem::StubSpecification::PREFIX}#{extensions.join "\0"}" unless
       extensions.empty?
     result << "#{Gem::StubSpecification::TARGET_PREFIX}platform=#{platform}" if content_addressed
+    unless files.empty?
+      files_line = "#{Gem::StubSpecification::FILES_PREFIX}#{files.join "\0"}"
+      # A newline in a file path would split the stub line and corrupt parsing,
+      # so fall back to the eval path for such gems by omitting the line.
+      result << files_line unless files_line.include?("\n")
+    end
     result << nil
     result << "Gem::Specification.new do |s|"
 
