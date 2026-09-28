@@ -1,0 +1,100 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build gems and packages
+    runs-on: ubuntu-24.04
+    if: github.repository == 'ruby/rubygems'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup ruby
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: ruby
+          bundler: none
+      - name: Install dependencies
+        run: bin/rake dev:frozen_deps
+      - name: Build
+        run: bin/rake release:build
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pkg
+          path: |
+            pkg/*.gem
+            pkg/*.tgz
+            pkg/*.zip
+            bundler/pkg/*.gem
+          if-no-files-found: error
+
+  publish:
+    name: Push gems to rubygems.org
+    needs: build
+    # A manual run only builds, so the packages can be checked without releasing.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    environment: rubygems-release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup ruby
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: ruby
+          bundler: none
+      - name: Install dependencies
+        run: bin/rake dev:frozen_deps
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: pkg
+      - name: Configure trusted publishing credentials
+        uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a # v2.1.0
+      # RubyGems 4.0 cannot attest a push by itself. The patch steps aside on
+      # versions that do.
+      - name: Fetch the attestation patch of rubygems/release-gem
+        run: curl -fsSL -o "$RUNNER_TEMP/rubygems-attestation-patch.rb" https://raw.githubusercontent.com/rubygems/release-gem/7f9650160c1a4e7989fdc9855807bdbd421d8b6b/rubygems-attestation-patch.rb
+      - name: Push
+        run: bin/rake "release:push[${GITHUB_REF_NAME}]"
+        env:
+          RUBYOPT: -r${{ runner.temp }}/rubygems-attestation-patch.rb
+      - name: Wait for the gems to be available
+        run: gem exec rubygems-await pkg/*.gem bundler/pkg/*.gem
+
+  github_release:
+    name: Create GitHub release
+    needs: publish
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup ruby
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: ruby
+          bundler: none
+      - name: Install dependencies
+        run: bin/rake dev:frozen_deps install_release_dependencies
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: pkg
+      - name: Create release
+        run: bin/rake upload_to_github
+        env:
+          GITHUB_RELEASE_PAT: ${{ github.token }}
