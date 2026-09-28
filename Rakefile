@@ -198,6 +198,27 @@ task release: :prerelease do
   Rake::Task["postrelease"].invoke
 end
 
+desc "Build the rubygems-update and bundler gems and the rubygems packages"
+task "release:build" => %w[clobber bundler:build_metadata package bundler:build]
+
+desc "Push the gems built by release:build to rubygems.org"
+task "release:push", [:tag] do |_t, opts|
+  bundler_version = Bundler::GemHelper.gemspec.version
+  unless opts[:tag] == "v#{v}" && bundler_version == v
+    abort "Tag #{opts[:tag]} does not match rubygems #{v} and bundler #{bundler_version}"
+  end
+
+  require "net/http"
+  { "rubygems-update" => "pkg", "bundler" => "bundler/pkg" }.each do |name, dir|
+    # A rerun after a partial failure must not try to push a gem again.
+    if Net::HTTP.get_response(URI("https://rubygems.org/api/v2/rubygems/#{name}/versions/#{v}.json")).is_a?(Net::HTTPSuccess)
+      puts "#{name}-#{v} is already on rubygems.org"
+    else
+      sh "ruby", "-Ilib", "exe/gem", "push", "#{dir}/#{name}-#{v}.gem"
+    end
+  end
+end
+
 Gem::PackageTask.new(spec) {}
 
 Rake::Task["package"].enhance ["pkg/rubygems-#{v}.tgz", "pkg/rubygems-#{v}.zip"]
@@ -354,13 +375,17 @@ namespace "blog" do
   post_page = "_posts/#{date}-#{v}-released.md"
   checksums = ""
 
+  add_checksum = lambda do |file|
+    digest = OpenSSL::Digest::SHA256.file(file).hexdigest
+    checksums += "* #{File.basename(file)}  \n"
+    checksums += "  #{digest}\n"
+    digest
+  end
+
   task "checksums" => "package" do
     Dir["pkg/*{tgz,zip,gem}"].each do |file|
-      digest = OpenSSL::Digest::SHA256.file(file).hexdigest
+      digest = add_checksum.call(file)
       basename = File.basename(file)
-
-      checksums += "* #{basename}  \n"
-      checksums += "  #{digest}\n"
 
       if ENV["DRYRUN"]
         puts "DRYRUN mode: skipping checksum verification for #{file}"
@@ -394,7 +419,7 @@ namespace "blog" do
 
   task "update" => [path]
 
-  file path => "checksums" do
+  announcement = lambda do
     name  = `git config --get user.name`.strip
     email = `git config --get user.email`.strip
 
@@ -402,10 +427,7 @@ namespace "blog" do
     rubygems_history = Changelog.for_rubygems(v.to_s)
     bundler_history = Changelog.for_bundler(v.to_s)
 
-    require "tempfile"
-
-    Tempfile.open "blog_post" do |io|
-      io.write <<-ANNOUNCEMENT
+    <<-ANNOUNCEMENT
 ---
 title: #{v} Released
 layout: post
@@ -442,14 +464,28 @@ SHA256 Checksums:
 
 [download]: https://rubygems.org/pages/download
 
-      ANNOUNCEMENT
+    ANNOUNCEMENT
+  end
 
+  file path => "checksums" do
+    require "tempfile"
+
+    Tempfile.open "blog_post" do |io|
+      io.write announcement.call
       io.flush
 
       sh(ENV["EDITOR"] || "vim", io.path)
 
       FileUtils.cp io.path, path
     end
+  end
+
+  # The blog repository's workflow downloads the released packages from the
+  # GitHub release into pkg/, so they are neither built nor verified here.
+  desc "Write the release announcement for the released packages in pkg/ into DIR"
+  task "draft", [:dir] do |_t, opts|
+    Dir["pkg/*{tgz,zip,gem}"].each(&add_checksum)
+    File.write(File.join(opts[:dir], post_page), announcement.call)
   end
 
   task "commit" => %w[tmp/blog.rubygems.org] do
