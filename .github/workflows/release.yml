@@ -14,6 +14,8 @@ jobs:
     name: Build gems and packages
     runs-on: ubuntu-24.04
     if: github.repository == 'ruby/rubygems'
+    outputs:
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -23,6 +25,9 @@ jobs:
         with:
           ruby-version: ruby
           bundler: none
+      - name: Check the version
+        id: version
+        run: echo "prerelease=$(ruby -Ilib -e 'print Gem::Version.new(Gem::VERSION).prerelease?')" >> "$GITHUB_OUTPUT"
       - name: Install dependencies
         run: bin/rake dev:frozen_deps
       - name: Build
@@ -98,3 +103,43 @@ jobs:
         run: bin/rake upload_to_github
         env:
           GITHUB_RELEASE_PAT: ${{ github.token }}
+
+  guides:
+    name: Update guides
+    needs: [build, github_release]
+    if: needs.build.outputs.prerelease == 'false'
+    runs-on: ubuntu-24.04
+    environment: rubygems-release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: 5103938
+          private-key: ${{ secrets.RUBYGEMS_RELEASE_APP_PRIVATE_KEY }}
+          owner: rubygems
+          repositories: guides
+          permission-contents: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rubygems/guides
+          path: tmp/guides.rubygems.org
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+      - name: Setup ruby
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1.321.0
+        with:
+          ruby-version: ruby
+          bundler: none
+      - name: Install dependencies
+        run: bin/rake dev:frozen_deps
+      - name: Publish
+        run: bin/rake guides:publish
+        env:
+          GIT_AUTHOR_NAME: rubygems-release[bot]
+          GIT_AUTHOR_EMAIL: 334817275+rubygems-release[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: rubygems-release[bot]
+          GIT_COMMITTER_EMAIL: 334817275+rubygems-release[bot]@users.noreply.github.com
