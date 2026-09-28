@@ -198,6 +198,27 @@ task release: :prerelease do
   Rake::Task["postrelease"].invoke
 end
 
+desc "Build the rubygems-update and bundler gems and the rubygems packages"
+task "release:build" => %w[clobber bundler:build_metadata package bundler:build]
+
+desc "Push the gems built by release:build to rubygems.org"
+task "release:push", [:tag] do |_t, opts|
+  bundler_version = Bundler::GemHelper.gemspec.version
+  unless opts[:tag] == "v#{v}" && bundler_version == v
+    abort "Tag #{opts[:tag]} does not match rubygems #{v} and bundler #{bundler_version}"
+  end
+
+  require "net/http"
+  { "rubygems-update" => "pkg", "bundler" => "bundler/pkg" }.each do |name, dir|
+    # A rerun after a partial failure must not try to push a gem again.
+    if Net::HTTP.get_response(URI("https://rubygems.org/api/v2/rubygems/#{name}/versions/#{v}.json")).is_a?(Net::HTTPSuccess)
+      puts "#{name}-#{v} is already on rubygems.org"
+    else
+      sh "ruby", "-Ilib", "exe/gem", "push", "#{dir}/#{name}-#{v}.gem"
+    end
+  end
+end
+
 Gem::PackageTask.new(spec) {}
 
 Rake::Task["package"].enhance ["pkg/rubygems-#{v}.tgz", "pkg/rubygems-#{v}.zip"]
