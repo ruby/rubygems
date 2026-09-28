@@ -143,3 +143,26 @@ jobs:
           GIT_AUTHOR_EMAIL: 334817275+rubygems-release[bot]@users.noreply.github.com
           GIT_COMMITTER_NAME: rubygems-release[bot]
           GIT_COMMITTER_EMAIL: 334817275+rubygems-release[bot]@users.noreply.github.com
+
+  blog:
+    name: Request the release announcement
+    needs: github_release
+    runs-on: ubuntu-24.04
+    environment: rubygems-release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: 5103938
+          private-key: ${{ secrets.RUBYGEMS_RELEASE_APP_PRIVATE_KEY }}
+          owner: rubygems
+          repositories: blog
+          permission-actions: write
+      - name: Draft the announcement in rubygems/blog
+        run: gh workflow run release-announcement.yml -R rubygems/blog -f version="${GITHUB_REF_NAME#v}" -f author="$(git log -1 --format=%an)" -f author_email="$(git log -1 --format=%ae)"
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
