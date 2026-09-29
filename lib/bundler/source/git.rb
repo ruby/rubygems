@@ -26,7 +26,7 @@ module Bundler
         @ref        = options["ref"] || options["branch"] || options["tag"]
         @submodules = options["submodules"]
         @name       = options["name"]
-        @version    = options["version"].to_s.strip.gsub("-", ".pre.")
+        @version    = Gem::Version.normalize_hyphens(options["version"].to_s.strip)
 
         @copied     = false
         @local      = false

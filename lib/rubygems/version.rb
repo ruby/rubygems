@@ -29,6 +29,15 @@ module Gem; end
 # 3. 1.0.a.2
 # 4. 0.9
 #
+# SemVer-style hyphens are accepted and normalized so that a hyphenated
+# prerelease matches the equivalent dotted form when the prerelease
+# identifier already contains a letter:
+#
+#   Gem::Version.new("1.0.0-beta.1") == Gem::Version.new("1.0.0.beta.1")
+#
+# A hyphen before a purely numeric identifier is replaced with ".pre." so
+# the result remains a prerelease (e.g. "1.0.0-1" becomes "1.0.0.pre.1").
+#
 # If you want to specify a version restriction that includes both prereleases
 # and regular releases of 1.x or later versions:
 #
@@ -221,7 +230,8 @@ class Gem::Version
 
   ##
   # Constructs a Version from the +version+ string.  A version string is a
-  # series of digits or ASCII letters separated by dots.
+  # series of digits or ASCII letters separated by dots.  Hyphens are
+  # normalized as described in the class documentation.
 
   def initialize(version)
     unless self.class.correct?(version)
@@ -237,11 +247,34 @@ class Gem::Version
     # it's to_s won't have any spaces or dashes
     unless version.is_a?(Integer)
       @version = @version.strip
-      @version.gsub!("-",".pre.")
+      @version = self.class.normalize_hyphens(@version)
     end
     @version = -@version
     @segments = nil
     @sort_key = compute_sort_key
+  end
+
+  ##
+  # Replace SemVer-style hyphens with RubyGems prerelease segments.
+  #
+  # When the first identifier after a hyphen already contains a letter,
+  # the hyphen becomes a dot so "1.0.0-beta.1" and "1.0.0.beta.1" are
+  # the same version.  Purely numeric identifiers still get ".pre." so
+  # "1.0.0-1" remains a prerelease ("1.0.0.pre.1").
+
+  def self.normalize_hyphens(string) # :nodoc:
+    return string unless string.include?("-")
+
+    string.split("-").map.with_index do |part, index|
+      next part if index.zero?
+
+      first_identifier = part[/\A[^.]+/]
+      if first_identifier && /[a-zA-Z]/.match?(first_identifier)
+        part
+      else
+        "pre.#{part}"
+      end
+    end.join(".")
   end
 
   ##
@@ -426,7 +459,7 @@ class Gem::Version
       canonical_version = @version.sub(/(?<=[a-zA-Z.])[.0]+\z/, "")
       # remove 0 segments before the first letter in a prerelease version
       canonical_version.sub!(/(?<=\.|\A)[0.]+(?=[a-zA-Z])/, "") if prerelease?
-      partition_segments(canonical_version)
+      skip_redundant_pre_segments(partition_segments(canonical_version))
     end
   end
 
@@ -468,5 +501,26 @@ class Gem::Version
     ver.scan(/\d+|[a-z]+/i).map! do |s|
       /\A\d/.match?(s) ? s.to_i : -s
     end.freeze
+  end
+
+  # Older hyphen normalization always inserted "pre" before the prerelease
+  # label ("1.0.0-beta.1" => "1.0.0.pre.beta.1").  Skip that redundant
+  # "pre" when the next segment is already a letter so those versions stay
+  # equal to the dotted form ("1.0.0.beta.1").
+  def skip_redundant_pre_segments(segments)
+    return segments unless segments.include?("pre")
+
+    result = []
+    i = 0
+    while i < segments.length
+      seg = segments[i]
+      if seg == "pre" && i + 1 < segments.length && String === segments[i + 1]
+        i += 1
+        next
+      end
+      result << seg
+      i += 1
+    end
+    result.freeze
   end
 end

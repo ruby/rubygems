@@ -200,6 +200,22 @@ class TestGemVersion < Gem::TestCase
     assert_less_than "1.0.0-1", "1"
   end
 
+  # See https://github.com/ruby/rubygems/issues/9910
+  def test_hyphen_and_dot_prerelease_are_the_same_version
+    assert_version_equal "1.0.0.beta.1", "1.0.0-beta.1"
+    assert_version_equal "1.0.0.rc.1", "1.0.0-rc.1"
+    assert_version_equal "1.2.3.beta", "1.2.3-beta"
+    assert_equal "1.0.0.beta.1", v("1.0.0-beta.1").version
+
+    # Numeric identifiers after a hyphen still need ".pre." to stay prereleases
+    assert_equal "1.0.0.pre.1", v("1.0.0-1").version
+    assert_prerelease "1.0.0-1"
+    refute_version_equal "1.0.0.1", "1.0.0-1"
+
+    # Legacy ".pre." insertion before a letter label still compares equal
+    assert_version_equal "1.0.0.beta.1", "1.0.0.pre.beta.1"
+  end
+
   def test_sort_key_is_computed_on_regular_release
     refute_nil v("9.8.7").send(:sort_key)
   end
