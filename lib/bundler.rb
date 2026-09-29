@@ -187,7 +187,7 @@ module Bundler
       rescue GemNotFound, GitError
         ui.info "Automatically installing missing gems."
         reset!
-        CLI::Install.new({}).run
+        auto_install_missing_gems
         reset!
       end
     end
@@ -604,6 +604,44 @@ module Bundler
     end
 
     private
+
+    # When possible we do the install in a subprocess because to install gems
+    # we need to require some default gems like `openssl` (for HTTPS remotes)
+    # which may later conflict with the Gemfile requirements. `bundler/inline`
+    # re-resolves when that happens. We can't: the `Bundler.setup` that follows
+    # must activate what the lockfile says.
+    def auto_install_missing_gems
+      do_install = -> { CLI::Install.new({}).run }
+
+      if Process.respond_to?(:fork)
+        [$stdout, $stderr].each(&:flush) # don't let the fork inherit buffered output
+
+        _, status = Process.waitpid2(Process.fork do
+          exit_status = 1
+
+          begin
+            # Errors here never reach the parent's handler. Report them in the
+            # child, and let the parent exit with the status. Required inside the
+            # fork so the CLI's vendored Thor stays out of the parent.
+            require_relative "bundler/friendly_errors"
+
+            with_friendly_errors(&do_install)
+            exit_status = 0
+          rescue SystemExit => e
+            exit_status = e.status
+          ensure
+            # Skip `at_exit` handlers, they belong to the booting program.
+            # `exit!` doesn't flush, so flush by hand.
+            [$stdout, $stderr].each(&:flush)
+            exit!(exit_status)
+          end
+        end)
+
+        exit(status.exitstatus || status.to_i) unless status.success?
+      else
+        do_install.call
+      end
+    end
 
     def unbundle_env(env)
       if env.key?("BUNDLER_ORIG_MANPATH")

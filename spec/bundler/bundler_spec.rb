@@ -250,6 +250,36 @@ RSpec.describe Bundler do
     end
   end
 
+  describe "#auto_install" do
+    let(:install) { double("install") }
+
+    before do
+      skip "requires Process.fork" unless Process.respond_to?(:fork)
+
+      definition = double("definition")
+      allow(definition).to receive(:specs).and_raise(Bundler::GemNotFound)
+      allow(Bundler).to receive(:definition).and_return(definition)
+      allow(Bundler::CLI::Install).to receive(:new).with({}).and_return(install)
+    end
+
+    it "installs in a subprocess, so that gems activated to install don't conflict with the Gemfile" do
+      installer_pid = tmp("auto_install_pid")
+      allow(install).to receive(:run) { File.write(installer_pid, Process.pid) }
+
+      Bundler.settings.temporary(auto_install: true) { Bundler.auto_install }
+
+      expect(installer_pid.read.to_i).not_to eq(Process.pid)
+    end
+
+    it "exits with the status code of a failed install" do
+      allow(install).to receive(:run).and_raise(Bundler::InstallError)
+
+      expect do
+        Bundler.settings.temporary(auto_install: true) { Bundler.auto_install }
+      end.to raise_error(SystemExit) {|error| expect(error.status).to eq(5) }
+    end
+  end
+
   describe "#mkdir_p" do
     it "creates a folder at the given path" do
       install_gemfile <<-G
