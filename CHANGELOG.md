@@ -4,7 +4,7 @@
 
 ### Enhancements:
 
-* Add --source option to gem exec command. Pull request [#9765](https://github.com/ruby/rubygems/pull/9765) by Akshay Birajdar and Akshay Birajdar
+* Add --source option to gem exec command. Pull request [#9765](https://github.com/ruby/rubygems/pull/9765) by Akshay Birajdar
 * Keep credentials on redirects only within the same origin. Pull request [#9909](https://github.com/ruby/rubygems/pull/9909) by Hiroshi SHIBATA
 * Validate the version field in Gem::Installer#verify_spec. Pull request [#9890](https://github.com/ruby/rubygems/pull/9890) by Hiroshi SHIBATA
 * Installs bundler 4.0.22 as a default gem.
