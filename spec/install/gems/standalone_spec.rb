@@ -287,6 +287,19 @@ RSpec.describe "bundle install --standalone" do
       expect(extension_line).to start_with '$:.unshift File.expand_path("#{__dir__}/../#{RUBY_ENGINE}/#{Gem.ruby_api_version}/extensions/'
       expect(extension_line).to end_with platform.to_s + '/#{Gem.extension_api_version}/very_simple_binary-1.0")'
     end
+
+    it "loads when Gem is defined but RubyGems has not defined its API helpers" do
+      ruby <<-RUBY
+        Gem.singleton_class.remove_method(:ruby_api_version, :extension_api_version)
+
+        $:.unshift File.expand_path("bundle")
+        require "bundler/setup"
+
+        puts "WIN"
+      RUBY
+
+      expect(out).to eq("WIN")
+    end
   end
 
   describe "with gem that has an invalid gemspec" do
