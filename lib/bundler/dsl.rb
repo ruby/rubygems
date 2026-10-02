@@ -121,6 +121,7 @@ module Bundler
       if cooldown && !(cooldown.is_a?(Integer) && cooldown >= 0)
         raise InvalidOption, "Expected `cooldown` to be a non-negative integer, got #{cooldown.inspect}"
       end
+      overrides = options["overrides"]
 
       if options.key?("type")
         options["type"] = options["type"].to_s
@@ -141,9 +142,13 @@ module Bundler
         source_opts = options.merge("uri" => source)
         with_source(@sources.add_plugin_source(options["type"], source_opts), &blk)
       elsif block_given?
-        with_source(@sources.add_rubygems_source("remotes" => source, "cooldown" => cooldown), &blk)
+        with_source(@sources.add_rubygems_source(
+                      "remotes" => source,
+                      "cooldown" => cooldown,
+                      "overrides" => overrides
+                    ), &blk)
       else
-        @sources.add_global_rubygems_remote(source, cooldown: cooldown)
+        @sources.add_global_rubygems_remote(source, cooldown: cooldown, overrides: overrides)
       end
     end
 
