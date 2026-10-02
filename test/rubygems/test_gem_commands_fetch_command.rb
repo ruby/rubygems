@@ -119,7 +119,7 @@ class TestGemCommandsFetchCommand < Gem::TestCase
 
     @cmd.options[:args] = %w[a]
 
-    @fetcher.data["#{@gem_repo}latest_specs.#{Gem.marshal_version}.gz"] = util_gzip(Marshal.dump([
+    @fetcher.data["#{@gem_repo}specs.#{Gem.marshal_version}.gz"] = util_gzip(Marshal.dump([
       Gem::NameTuple.new(a2_spec.name, a2_spec.version, a2_spec.platform),
       Gem::NameTuple.new(a2_universal_darwin_spec.name, a2_universal_darwin_spec.version, a2_universal_darwin_spec.platform),
     ]))
@@ -136,6 +136,66 @@ class TestGemCommandsFetchCommand < Gem::TestCase
 
     assert_path_exist(File.join(@tempdir, a2_universal_darwin_spec.file_name),
                        "#{a2_universal_darwin_spec.full_name} not fetched")
+  end
+
+  def test_execute_compact_index
+    specs = spec_fetcher do |fetcher|
+      fetcher.gem "a", 1
+      fetcher.gem "a", 2
+    end
+
+    util_setup_compact_index(*specs.values)
+
+    @cmd.options[:args] = %w[a]
+
+    execute_with_exit_code
+
+    a2 = specs["a-2"]
+
+    assert_path_exist(File.join(@tempdir, a2.file_name),
+                      "#{a2.full_name} not fetched")
+
+    assert_includes @fetcher.paths, "#{@gem_repo}info/a"
+    refute_includes @fetcher.paths, "#{@gem_repo}specs.#{Gem.marshal_version}.gz"
+  end
+
+  def test_execute_compact_index_platform
+    specs = spec_fetcher do |fetcher|
+      fetcher.gem "a", 2
+      fetcher.gem("a", 2) {|s| s.platform = "universal-darwin" }
+    end
+
+    util_setup_compact_index(*specs.values)
+
+    @cmd.options[:args] = %w[a]
+
+    util_set_arch "arm64-darwin20" do
+      execute_with_exit_code
+    end
+
+    a2_universal_darwin = specs["a-2-universal-darwin"]
+
+    assert_path_exist(File.join(@tempdir, a2_universal_darwin.file_name),
+                      "#{a2_universal_darwin.full_name} not fetched")
+  end
+
+  def test_execute_compact_index_platform_mismatch
+    specs = spec_fetcher do |fetcher|
+      fetcher.spec("a", 2) {|s| s.platform = "java" }
+    end
+
+    util_setup_compact_index(*specs.values)
+
+    @cmd.options[:args] = %w[a]
+
+    execute_with_term_error
+
+    expected = <<-EXPECTED
+ERROR:  Could not find a valid gem 'a' (>= 0), here is why:
+          Found a (2), but was for platform java
+    EXPECTED
+
+    assert_equal expected, @ui.error
   end
 
   def test_execute_specific_prerelease
