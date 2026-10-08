@@ -1747,6 +1747,24 @@ class TestGemSafeYAML < Gem::TestCase
     Gem::SafeYAML.aliases_enabled = aliases_enabled
   end
 
+  def test_load_anchor_at_end_of_line_before_sequence
+    result = yaml_load("a: &1\n- x\n- y\nb: *1\n")
+    assert_equal({ "a" => ["x", "y"], "b" => ["x", "y"] }, result)
+    assert_same result["a"], result["b"]
+  end
+
+  def test_load_anchor_at_end_of_line_before_indented_sequence
+    result = yaml_load("a: &1\n  - x\n  - y\nb: *1\n")
+    assert_equal({ "a" => ["x", "y"], "b" => ["x", "y"] }, result)
+    assert_same result["a"], result["b"]
+  end
+
+  def test_load_anchor_at_end_of_line_before_mapping
+    result = yaml_load("a: &1\n  k: v\nb: *1\n")
+    assert_equal({ "a" => { "k" => "v" }, "b" => { "k" => "v" } }, result)
+    assert_same result["a"], result["b"]
+  end
+
   def test_regression_coerce_empty_hash_not_wrapped_in_scalar
     # Previously coerce("{}") returned Mapping but parse_plain_scalar
     # wrapped it in Scalar.new(value: Mapping), causing type mismatch.

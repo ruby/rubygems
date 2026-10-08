@@ -177,7 +177,7 @@ module Gem
           content = line[indent + 1, line.size]
           content.strip!
           item_anchor = nil
-          item_anchor, content = extract_item_anchor(content) if content.start_with?("&")
+          item_anchor, content = extract_anchor(content) if content.start_with?("&")
           item = parse_sequence_item(content, indent)
           items << register_anchor(item_anchor, item)
         end
@@ -232,7 +232,7 @@ module Gem
           val = strip_comment(val || "")
 
           val_anchor = nil
-          val_anchor, val = consume_value_anchor(val) if val.start_with?("&")
+          val_anchor, val = extract_anchor(val) if val.start_with?("&")
           value = parse_mapping_value(val, indent)
           value = register_anchor(val_anchor, value) if val_anchor
 
@@ -456,18 +456,11 @@ module Gem
         anchor
       end
 
-      def extract_item_anchor(content)
+      def extract_anchor(content)
         return [nil, content] unless content =~ /^&(\S+)/
 
         anchor = $1
         [anchor, content.sub(/^&#{Regexp.escape(anchor)}\s*/, "")]
-      end
-
-      def consume_value_anchor(val)
-        return [nil, val] unless val =~ /^&(\S+)\s+/
-
-        anchor = $1
-        [anchor, val.sub(/^&#{Regexp.escape(anchor)}\s+/, "")]
       end
 
       def register_anchor(name, node)
