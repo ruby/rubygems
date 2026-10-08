@@ -137,8 +137,11 @@ module Gem
 
         pos = indent
         if /\G&/.match?(line, indent) && (anchor = consume_anchor)
+          # A lone anchor line, e.g. "--- &1", anchors the node on the next line.
+          skip_blank_and_comments
+          return nil if @lines.empty? || current_indent < base_indent
           line = @lines[0]
-          pos = indent_of(line)
+          indent = pos = indent_of(line)
         end
 
         if SEQUENCE_ENTRY_RE.match?(line, pos)
@@ -449,10 +452,14 @@ module Gem
       def consume_anchor
         line = @lines[0]
         stripped = line.lstrip
-        return nil unless stripped.start_with?("&") && stripped =~ /^&(\S+)\s+/
+        return nil unless stripped.start_with?("&") && stripped =~ /^&(\S+)\s*/
 
         anchor = $1
-        @lines[0] = line.sub(/&#{Regexp.escape(anchor)}\s+/, "")
+        if $'.empty?
+          @lines.shift
+        else
+          @lines[0] = line.sub(/&#{Regexp.escape(anchor)}\s+/, "")
+        end
         anchor
       end
 
