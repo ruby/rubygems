@@ -573,8 +573,8 @@ module Gem
           raise Psych::BadAlias, "exceeded maximum alias resolutions (#{MAX_ALIAS_RESOLUTIONS})"
         end
         unless @anchor_values.key?(node.name)
-          klass = defined?(Psych::AnchorNotDefined) ? Psych::AnchorNotDefined : Psych::BadAlias
-          raise klass, "An alias referenced an unknown anchor: #{node.name}"
+          raise Psych::AnchorNotDefined, node.name if defined?(Psych::AnchorNotDefined)
+          raise Psych::BadAlias, "An alias referenced an unknown anchor: #{node.name}"
         end
         @anchor_values.fetch(node.name)
       end

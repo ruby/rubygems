@@ -162,6 +162,14 @@ class TestGemSafeYAML < Gem::TestCase
     assert_raise(expected_error) { Gem::SafeYAML.safe_load(yaml) }
   end
 
+  def test_unknown_alias_message
+    expected_error = defined?(Psych::AnchorNotDefined) ? Psych::AnchorNotDefined : Psych::BadAlias
+    error = assert_raise(expected_error) do
+      Gem::YAMLSerializer.load("foo: 1\nbar: *missing\n")
+    end
+    assert_equal "An alias referenced an unknown anchor: missing", error.message
+  end
+
   def test_unused_anchor_with_aliases_disabled_is_allowed
     aliases_enabled = Gem::SafeYAML.aliases_enabled?
     Gem::SafeYAML.aliases_enabled = false
