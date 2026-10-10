@@ -4,6 +4,10 @@ module Bundler
   class Injector
     INJECTED_GEMS = "injected gems"
 
+    # Paired delimiters for percent literals such as `%w[a b]`.
+    PERCENT_LITERAL_PAIRS = { "(" => ")", "[" => "]", "{" => "}", "<" => ">" }.freeze
+    PERCENT_LITERAL_TYPES = "qQwWiIrxs"
+
     def self.inject(new_deps, options = {})
       injector = new(new_deps, options)
       injector.inject(Bundler.default_gemfile, Bundler.default_lockfile)
@@ -12,6 +16,15 @@ module Bundler
     def self.remove(gems, options = {})
       injector = new(gems, options)
       injector.remove(Bundler.default_gemfile, Bundler.default_lockfile)
+    end
+
+    # Rewrites the version requirements of gems already declared in the
+    # Gemfile, preserving options (groups, source, require, ...) and comments.
+    # @param requirements [Hash{String => String, Array<String>}] gem name to new requirement(s)
+    #   (e.g. `{ "rails" => ">= 8.0.0" }` or `{ "rails" => ["> 5.0.0", "< 5.1.1"] }`)
+    # @return [Array<String>] names of gems whose Gemfile entries were rewritten
+    def self.update_requirements(requirements)
+      new([]).update_requirements(requirements)
     end
 
     def initialize(deps, options = {})
@@ -73,6 +86,61 @@ module Bundler
       # Invalidate the cached Bundler.definition.
       # This prevents e.g. `bundle remove ...` from using outdated information.
       Bundler.reset_paths!
+    end
+
+    # @param [Hash{String => String, Array<String>}] requirements Gem name to new requirement(s).
+    # @return [Array<String>] Names of gems whose Gemfile entries were rewritten.
+    def update_requirements(requirements)
+      Bundler.definition.ensure_equivalent_gemfile_and_lockfile(true)
+
+      # temporarily unfreeze
+      Bundler.settings.temporary(deployment: false, frozen: false) do
+        updated = []
+
+        Bundler.definition.gemfiles.each do |path|
+          next unless File.file?(path)
+
+          names = requirements.keys.select {|name| gemfile_declares?(path, name) }
+          next if names.empty?
+
+          updated |= rewrite_gemfile_requirements(path, requirements.slice(*names))
+        end
+
+        # invalidate the cached Bundler.definition, since the Gemfile changed
+        Bundler.reset_paths!
+
+        updated
+      end
+    end
+
+    # Reads back the operators declared for a gem in a Gemfile, straight
+    # from the source text. This distinguishes `gem "foo", "1.0"` (bare,
+    # reported as nil) from `gem "foo", "= 1.0"` (explicit), which look
+    # identical once parsed into a Gem::Requirement.
+    # @return [Array<String, nil>, nil] explicit operators of the leading
+    #   version arguments (nil element means bare), empty when no version is
+    #   declared, nil when the gem is not declared in the file.
+    def self.declared_operators(gemfile_path, name)
+      new([], {}).declared_operators(gemfile_path, name)
+    end
+
+    def declared_operators(gemfile_path, name)
+      declaration = find_gem_declaration(gemfile_path, name)
+      return if declaration.nil?
+
+      code, = split_line_comments(declaration)
+      match_data = code.match(/\A(\s*gem\s*)(?:\(\s*)?(['"])(.+?)\2/)
+      return if match_data.nil? || match_data[3] != name
+
+      paren = code.match?(/\A\s*gem\s*\(/)
+      rest = code[match_data[0].length..] || ""
+      rest = rest.sub(/\A\s*,\s*/, "")
+      rest = rest.sub(/\s*\)\s*\z/, "") if paren
+
+      args = split_top_level_commas(rest).map(&:strip).reject(&:empty?)
+      args.take_while {|arg| version_argument?(arg) }.map do |arg|
+        leading_literal(arg)[1..-2][/\A(>=|>|<=|<|~>|=|!=)/, 1]
+      end
     end
 
     private
@@ -279,6 +347,472 @@ module Bundler
       autorequire = autorequire.first
       return autorequire if autorequire == "false"
       autorequire.inspect
+    end
+
+    def gemfile_declares?(gemfile_path, name)
+      pattern = /gem\s+(['"])#{Regexp.escape(name)}\1|gem\s*\((['"])#{Regexp.escape(name)}\2/
+      File.foreach(gemfile_path) do |line|
+        match_data = line.match(pattern)
+        return true if match_data && is_not_within_comment?(line, match_data)
+      end
+      false
+    end
+
+    # @return [String] the line with any trailing comment removed.
+    def line_code(line)
+      index = line_comment_start(line)
+      index ? line[0...index] : line
+    end
+
+    # @return [Boolean] whether `line` continues a gem declaration onto the
+    #   next line. The code (the line minus any trailing comment) continues
+    #   while it ends with a comma. Blank and comment-only lines keep a
+    #   declaration going only when it is already being continued, so a
+    #   standalone comment is not swallowed by the declaration before it.
+    def declaration_continues?(line, continuing)
+      code = line_code(line)
+      return continuing if code.strip.empty?
+
+      code.rstrip.end_with?(",")
+    end
+
+    # Returns the full text of the first `gem "name" ...` declaration in
+    # the file (possibly spanning multiple comma-continued lines), or nil.
+    def find_gem_declaration(gemfile_path, name)
+      return unless File.file?(gemfile_path)
+
+      pattern = /gem\s*(?:\(\s*)?(['"])#{Regexp.escape(name)}\1/
+      block = []
+      continuation = false
+      File.foreach(gemfile_path) do |line|
+        block << line
+        continuation = declaration_continues?(line, continuation)
+        next if continuation
+
+        first = block.first
+        text = block.join
+        block = []
+        match_data = first.match(pattern)
+        return text if match_data && is_not_within_comment?(first, match_data)
+      end
+      nil
+    end
+
+    # Rewrites the version requirements of the given gems in a single Gemfile,
+    # keeping options and comments intact. Multi-line declarations are
+    # collapsed to a single line.
+    def rewrite_gemfile_requirements(gemfile_path, requirements)
+      lines = File.readlines(gemfile_path)
+      updated = []
+      rewritten = []
+      block = []
+      continuation = false
+
+      flush = lambda do
+        unless block.empty?
+          name = gem_declaration_name(block.first)
+          if name && requirements.key?(name)
+            rewritten << rewrite_gem_declaration(block.join, name, requirements[name])
+            updated << name
+          else
+            rewritten << block.join
+          end
+          block = []
+        end
+      end
+
+      lines.each do |line|
+        block << line
+        # a declaration continues while its code ends with a comma
+        continuation = declaration_continues?(line, continuation)
+        flush.call unless continuation
+      end
+      flush.call
+
+      SharedHelpers.write_to_gemfile(gemfile_path, rewritten.join.chomp) unless updated.empty?
+
+      updated.uniq
+    end
+
+    def gem_declaration_name(first_line)
+      match_data = first_line.match(/gem\s*(?:\(\s*)?(['"])(.+?)\1/)
+      return unless match_data
+      return if match_data.offset(0).first > 0 && first_line[0...match_data.offset(0).first].include?("#")
+      match_data[2]
+    end
+
+    # Rewrites the version requirement arguments of a single `gem` declaration,
+    # leaving everything else -- options, comments, and the original layout of
+    # multi-line declarations -- untouched.
+    def rewrite_gem_declaration(declaration, name, requirement)
+      return collapsed_gem_declaration(declaration, name, requirement) if declaration_has_comment?(declaration)
+
+      match_data = declaration.match(/\A(\s*gem\s*)(?:\(\s*)?(['"])(.+?)\2/)
+      return declaration unless match_data && match_data[3] == name
+
+      body_end = declaration_body_end(declaration, match_data)
+      return declaration if body_end <= match_data.end(0)
+
+      requirements = Array(requirement).map(&:dump).join(", ")
+      spans = argument_spans(declaration, match_data.end(0), body_end)
+      version_spans = []
+      spans.each do |span|
+        arg = declaration[span[0]...span[1]]
+        break unless version_argument?(arg)
+
+        version_spans << [span[0], span[0] + leading_literal(arg).length]
+      end
+
+      if version_spans.empty?
+        # No version declared yet: add the requirement before any options.
+        insertion = match_data.end(0)
+        "#{declaration[0...insertion]}, #{requirements}#{declaration[insertion..]}"
+      else
+        "#{declaration[0...version_spans.first[0]]}#{requirements}#{declaration[version_spans.last[1]..]}"
+      end
+    end
+
+    # Rewrites a declaration onto a single line, the only option when the
+    # declaration carries a comment: a comment runs to the end of its line, so
+    # arguments cannot be spliced back in place around it. Comments are split
+    # off line by line, so a comment on one line does not swallow the
+    # arguments on the following lines; they are re-appended to the collapsed
+    # declaration.
+    def collapsed_gem_declaration(declaration, name, requirement)
+      code, comments = split_line_comments(declaration)
+      match_data = code.match(/\A(\s*gem\s*)(?:\(\s*)?(['"])(.+?)\2/)
+      return declaration unless match_data
+      return declaration unless match_data[3] == name
+
+      paren = code.match?(/\A\s*gem\s*\(/)
+      indent = match_data[1][/^\s*/]
+      quote = match_data[2]
+      rest = code[match_data[0].length..] || ""
+      rest = rest.sub(/\A\s*,\s*/, "")
+      rest = rest.sub(/\s*\)\s*\z/, "") if paren
+
+      args = split_top_level_commas(rest).map(&:strip).reject(&:empty?)
+      version_args = args.take_while {|arg| version_argument?(arg) }
+      # A trailing modifier or method call glued to the last version argument
+      # (`"1.0" if cond`, `"1.0".freeze`) is not part of the version and is
+      # kept as it is.
+      modifier = version_args.empty? ? "" : version_args.last[leading_literal(version_args.last).length..]
+      options = args.drop(version_args.size)
+      options_suffix = options.empty? ? "" : ", #{options.join(", ")}"
+      requirements_suffix = Array(requirement).map(&:dump).join(", ")
+
+      rewritten = "#{indent}gem#{paren ? "(" : " "}#{quote}#{name}#{quote}, #{requirements_suffix}#{modifier}#{options_suffix}#{paren ? ")" : ""}"
+      comments.empty? ? "#{rewritten}\n" : "#{rewritten}  #{comments.join(" ")}\n"
+    end
+
+    # @return [Boolean] whether any line of the declaration carries a comment.
+    def declaration_has_comment?(declaration)
+      declaration.each_line.any? {|line| line_comment_start(line) }
+    end
+
+    # Splits a declaration into its code, with every `# comment` removed, and
+    # the comments themselves in order. Comments are found per line (see
+    # `line_comment_start`), so a comment only hides the rest of the line it
+    # is on and arguments on the following lines are kept.
+    # @return [Array(String, Array<String>)]
+    def split_line_comments(declaration)
+      code = +""
+      comments = []
+
+      declaration.each_line do |line|
+        index = line_comment_start(line)
+        if index
+          code << line[0...index] << "\n"
+          comments << line[index..].chomp
+        else
+          code << line
+        end
+      end
+
+      [code, comments]
+    end
+
+    # Offset of the `#` starting a comment on a line, or nil. A `#` starts a
+    # comment wherever it appears, so this is evaluated per line: a comment
+    # ends at the newline and the declaration can continue on the next line.
+    # `#` inside a string, a percent literal (`%w[a#b]`) or a regexp literal
+    # (`/a#b/`) does not start a comment.
+    def line_comment_start(line)
+      index = 0
+
+      while index < line.length
+        case line[index]
+        when "'", '"'
+          index = quoted_literal_end(line, index)
+        when "%"
+          index = percent_literal_end(line, index) || index + 1
+        when "/"
+          index = regexp_literal_end(line, index) || index + 1
+        when "#"
+          return index
+        else
+          index += 1
+        end
+      end
+
+      nil
+    end
+
+    # @return [Integer] offset just past the closing quote of the string
+    #   literal opening at `start`.
+    def quoted_literal_end(line, start)
+      quote = line[start]
+      index = start + 1
+
+      while index < line.length
+        if line[index] == "\\"
+          index += 2
+        elsif line[index] == quote
+          return index + 1
+        else
+          index += 1
+        end
+      end
+
+      line.length
+    end
+
+    # @return [Integer, nil] offset just past the `%w[a b]` style literal
+    #   opening at `start`, or nil when the `%` is not one (e.g. modulo).
+    def percent_literal_end(line, start)
+      index = start + 1
+      index += 1 if index < line.length && PERCENT_LITERAL_TYPES.include?(line[index])
+
+      opening = line[index]
+      return if opening.nil? || opening.match?(/[A-Za-z0-9_\s]/)
+
+      closing = PERCENT_LITERAL_PAIRS[opening]
+      return unpaired_delimiter_end(line, index, opening) if closing.nil?
+
+      depth = 0
+      while index < line.length
+        case line[index]
+        when "\\"
+          index += 2
+        when opening
+          depth += 1
+          index += 1
+        when closing
+          depth -= 1
+          return index + 1 if depth.zero?
+          index += 1
+        else
+          index += 1
+        end
+      end
+
+      line.length
+    end
+
+    # @return [Integer] offset just past the delimiter closing an unpaired
+    #   percent literal such as `%w!a b!`.
+    def unpaired_delimiter_end(line, delimiter_index, delimiter)
+      index = delimiter_index + 1
+
+      while index < line.length
+        if line[index] == "\\"
+          index += 2
+        elsif line[index] == delimiter
+          return index + 1
+        else
+          index += 1
+        end
+      end
+
+      line.length
+    end
+
+    # @return [Integer, nil] offset just past the regexp literal opening at
+    #   `start`, or nil when the `/` does not open one.
+    def regexp_literal_end(line, start)
+      return unless regexp_literal_start?(line, start)
+
+      index = start + 1
+      in_character_class = false
+
+      while index < line.length
+        case line[index]
+        when "\\"
+          index += 2
+        when "["
+          in_character_class = true
+          index += 1
+        when "]"
+          in_character_class = false
+          index += 1
+        when "/"
+          if in_character_class
+            index += 1
+          else
+            index += 1
+            index += 1 while index < line.length && line[index].match?(/[a-z]/i)
+            return index
+          end
+        else
+          index += 1
+        end
+      end
+
+      line.length
+    end
+
+    # A `/` opens a regexp literal at the start of an expression, which in a
+    # gem declaration means after `(`, `[`, `{`, `,`, `;`, `:`, `=` or `=>`.
+    def regexp_literal_start?(line, index)
+      previous = index - 1
+      previous -= 1 while previous >= 0 && line[previous].match?(/\s/)
+      return true if previous.negative?
+
+      "([{,;:".include?(line[previous]) || ["=", ">"].include?(line[previous])
+    end
+
+    # Offset just past the argument list of the declaration: the matching
+    # closing parenthesis for `gem(...)`, or the end of the text otherwise.
+    def declaration_body_end(declaration, match_data)
+      open_index = match_data[0].index("(")
+      return declaration.length unless open_index
+
+      matching_paren_offset(declaration, match_data.begin(0) + open_index) || declaration.length
+    end
+
+    # @return [Integer, nil] offset of the parenthesis closing the one at
+    #   `open_index`, ignoring parentheses inside quotes.
+    def matching_paren_offset(string, open_index)
+      depth = 0
+      quote = nil
+
+      string.each_char.with_index do |char, index|
+        next if index < open_index
+
+        if quote
+          quote = nil if char == quote && string[index - 1] != "\\"
+        elsif ["'", '"'].include?(char)
+          quote = char
+        elsif char == "("
+          depth += 1
+        elsif char == ")"
+          depth -= 1
+          return index if depth.zero?
+        end
+      end
+      nil
+    end
+
+    # @return [Array<Array(Integer, Integer)>] inclusive start and exclusive
+    #   end offset of every comma separated argument between `from` and `to`,
+    #   with surrounding whitespace trimmed off. Commas inside quotes or
+    #   nested brackets do not separate arguments.
+    def argument_spans(string, from, to)
+      spans = []
+      first = nil
+      last = nil
+      quote = nil
+      depth = 0
+
+      flush = lambda do
+        spans << [first, last + 1] if first
+        first = last = nil
+      end
+
+      string.each_char.with_index do |char, index|
+        next if index < from
+        break if index >= to
+
+        if quote
+          quote = nil if char == quote && string[index - 1] != "\\"
+          last = index
+        elsif ["'", '"'].include?(char)
+          quote = char
+          first ||= index
+          last = index
+        elsif ["(", "[", "{"].include?(char)
+          depth += 1
+          first ||= index
+          last = index
+        elsif [")", "]", "}"].include?(char)
+          depth -= 1
+          last = index
+        elsif char == "," && depth.zero?
+          flush.call
+        elsif char.match?(/\s/)
+          # whitespace does not extend the span of an argument
+        else
+          first ||= index
+          last = index
+        end
+      end
+      flush.call
+      spans
+    end
+
+    # The quoted string literal `arg` starts with, quotes included, or nil
+    # when `arg` starts with something else. The literal can be followed by
+    # more of the expression -- a trailing modifier (`"1.0" if cond`) or a
+    # method call (`"1.0".freeze`) -- which is not part of it.
+    def leading_literal(arg)
+      quote = arg[0]
+      return unless ["'", '"'].include?(quote)
+
+      index = 1
+      while index < arg.length
+        if arg[index] == "\\"
+          index += 2
+        elsif arg[index] == quote
+          return arg[0..index]
+        else
+          index += 1
+        end
+      end
+
+      nil
+    end
+
+    # @return [Boolean] whether `arg` starts with a quoted version
+    #   requirement, even when a trailing modifier or method call is glued to
+    #   it (`"1.0" if cond`, `"1.0".freeze`).
+    def version_argument?(arg)
+      literal = leading_literal(arg)
+      return false unless literal
+      Gem::Requirement::PATTERN.match?(literal[1..-2])
+    rescue ArgumentError
+      false
+    end
+
+    # Splits a comma separated argument list, ignoring commas inside
+    # quotes or nested brackets.
+    def split_top_level_commas(string)
+      parts = []
+      current = String.new
+      quote = nil
+      depth = 0
+
+      string.each_char.with_index do |char, index|
+        if quote
+          current << char
+          quote = nil if char == quote && string[index - 1] != "\\"
+        elsif ["'", '"'].include?(char)
+          quote = char
+          current << char
+        elsif ["(", "[", "{"].include?(char)
+          depth += 1
+          current << char
+        elsif [")", "]", "}"].include?(char)
+          depth -= 1
+          current << char
+        elsif char == "," && depth.zero?
+          parts << current
+          current = String.new
+        else
+          current << char
+        end
+      end
+      parts << current
+      parts
     end
   end
 end

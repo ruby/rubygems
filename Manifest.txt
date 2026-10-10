@@ -24,6 +24,7 @@ lib/bundler/ci_detector.rb
 lib/bundler/cli.rb
 lib/bundler/cli/add.rb
 lib/bundler/cli/binstubs.rb
+lib/bundler/cli/bump.rb
 lib/bundler/cli/cache.rb
 lib/bundler/cli/check.rb
 lib/bundler/cli/clean.rb
@@ -91,6 +92,8 @@ lib/bundler/man/bundle-add.1
 lib/bundler/man/bundle-add.1.ronn
 lib/bundler/man/bundle-binstubs.1
 lib/bundler/man/bundle-binstubs.1.ronn
+lib/bundler/man/bundle-bump.1
+lib/bundler/man/bundle-bump.1.ronn
 lib/bundler/man/bundle-cache.1
 lib/bundler/man/bundle-cache.1.ronn
 lib/bundler/man/bundle-check.1
