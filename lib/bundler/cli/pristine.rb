@@ -46,6 +46,14 @@ module Bundler
 
             next if git_sources.include?(source)
             git_sources << source
+          when Source::Path
+            extension_dir = source.extension_dir_for(spec)
+            unless extension_dir
+              Bundler.ui.warn("Cannot pristine #{gem_name}. Gem is sourced from local path.")
+              next
+            end
+
+            FileUtils.rm_rf extension_dir
           else
             Bundler.ui.warn("Cannot pristine #{gem_name}. Gem is sourced from local path.")
             next
