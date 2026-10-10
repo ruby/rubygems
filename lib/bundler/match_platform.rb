@@ -31,10 +31,20 @@ module Bundler
       return matching if addressable.empty?
 
       compatible = addressable.select(&:matches_current_metadata?)
+      compatible.reject! {|spec| longer_matching_content_address_available?(spec, compatible) }
       return compatible if compatible.any?
 
       non_addressable.any? ? non_addressable : matching
     end
+
+    def self.longer_matching_content_address_available?(spec, compatible_specs)
+      compatible_specs.any? do |compatible_spec|
+        compatible_spec.platform == spec.platform &&
+          compatible_spec.content_address.length > spec.content_address.length &&
+          compatible_spec.content_address.start_with?(spec.content_address)
+      end
+    end
+    private_class_method :longer_matching_content_address_available?
 
     def self.select_best_local_platform_match(specs, force_ruby: false, locked_platforms: nil)
       local = Bundler.local_platform
