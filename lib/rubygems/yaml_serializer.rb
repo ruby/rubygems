@@ -192,7 +192,7 @@ module Gem
           parse_inline_alias(content)
         elsif content.empty?
           skip_blank_and_comments
-          @lines.any? && current_indent > indent ? parse_node(indent) : nil
+          @lines.any? && current_indent > indent ? parse_node(indent + 1) : nil
         elsif content.start_with?("!ruby/object:")
           parse_tagged_content(content.strip, indent)
         elsif content.start_with?("!binary ")

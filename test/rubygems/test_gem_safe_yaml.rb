@@ -1785,6 +1785,10 @@ class TestGemSafeYAML < Gem::TestCase
     assert_equal({ "a" => nil, "b" => 2 }, yaml_load("a:\n  &1\nb: 2\n"))
   end
 
+  def test_load_anchor_alone_on_line_under_empty_sequence_item
+    assert_equal [nil, "x", "y"], yaml_load("-\n  &1\n- x\n- y\n")
+  end
+
   def test_regression_coerce_empty_hash_not_wrapped_in_scalar
     # Previously coerce("{}") returned Mapping but parse_plain_scalar
     # wrapped it in Scalar.new(value: Mapping), causing type mismatch.
