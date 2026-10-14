@@ -139,7 +139,7 @@ module Gem
         if /\G&/.match?(line, indent) && (anchor = consume_anchor)
           # A lone anchor line, e.g. "--- &1", anchors the node on the next line.
           skip_blank_and_comments
-          return nil if @lines.empty? || current_indent < base_indent
+          return register_anchor(anchor, nil) if @lines.empty? || current_indent < base_indent
           line = @lines[0]
           indent = pos = indent_of(line)
         end
@@ -472,6 +472,8 @@ module Gem
 
       def register_anchor(name, node)
         if name
+          # An anchored empty node still defines the anchor, as a null.
+          node ||= Scalar.new(nil)
           @anchors[name] = node
           node.anchor = name if node.respond_to?(:anchor=)
         end
