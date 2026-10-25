@@ -1578,6 +1578,23 @@ class TestGem < Gem::TestCase
     assert_equal %w[abi], PLUGINS_LOADED
   end
 
+  def test_load_plugins_loads_a_stub_once_across_gem_path_entries
+    other_gemhome = File.join @tempdir, "other_gemhome"
+    Gem.paths = { "GEM_HOME" => @gemhome, "GEM_PATH" => [@gemhome, other_gemhome].join(File::PATH_SEPARATOR) }
+
+    write_file File.join(Gem.plugindir(@gemhome), "mygem_plugin.rb") do |fp|
+      fp.puts "class TestGem; PLUGINS_LOADED << 'first'; end"
+    end
+
+    write_file File.join(Gem.plugindir(other_gemhome), "mygem_plugin.rb") do |fp|
+      fp.puts "class TestGem; PLUGINS_LOADED << 'second'; end"
+    end
+
+    Gem.load_plugins
+
+    assert_equal %w[first], PLUGINS_LOADED
+  end
+
   def test_load_user_installed_plugins
     @orig_gem_home = ENV["GEM_HOME"]
     ENV["GEM_HOME"] = @gemhome
