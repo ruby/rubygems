@@ -1368,6 +1368,27 @@ module Bundler
 
     def additional_base_requirements_to_force_updates(resolution_base)
       return resolution_base if @explicit_unlocks.empty?
+
+      if @overrides.empty? && !@explicit_unlocks.include?("bundler")
+        exact_dependencies = @explicit_unlocks.filter_map do |name|
+          matches = resolution_base.requirements.select {|dep| dep.name == name }
+          next unless matches.one?
+
+          dependency = matches.first
+          dependency if dependency.source.nil? && dependency.requirement.exact?
+        end
+
+        # Applicable exact requirements already determine every target version.
+        # Preserve the base pins used by the constrained resolver's retry logic.
+        if exact_dependencies.size == @explicit_unlocks.size
+          exact_dependencies.each do |dependency|
+            version = dependency.requirement.requirements.first.last
+            resolution_base.base_requirements[dependency.name] = Gem::Requirement.new("= #{version}")
+          end
+          return resolution_base
+        end
+      end
+
       full_update = SpecSet.new(new_resolver_for_full_update.start)
       @explicit_unlocks.each do |name|
         version = full_update.version_for(name)

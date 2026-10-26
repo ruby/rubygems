@@ -488,6 +488,69 @@ RSpec.describe "bundle update" do
       expect(lockfile).to include("solargraph (0.56.2)")
     end
 
+    context "with exact update targets" do
+      before do
+        build_repo4 do
+          build_gem "child", "1.0"
+          build_gem "child", "2.0"
+          build_gem "bar", "1.0"
+          build_gem "foo", "1.0" do |s|
+            s.add_dependency "child", ">= 1.0"
+          end
+          build_gem "parent", "1.0" do |s|
+            s.add_dependency "foo", ">= 1.0"
+          end
+        end
+      end
+
+      it "downgrades indirect dependencies without updating unrelated direct dependencies" do
+        install_gemfile <<~G
+          source "https://gem.repo4"
+          gem "foo", "= 1.0"
+          gem "bar"
+        G
+
+        build_repo4 do
+          build_gem "bar", "2.0"
+          build_gem "foo", "1.1" do |s|
+            s.add_dependency "child", "~> 1.0"
+          end
+        end
+
+        gemfile <<~G
+          source "https://gem.repo4"
+          gem "foo", "= 1.1"
+          gem "bar"
+        G
+
+        bundle "update foo"
+
+        expect(the_bundle).to include_gems("foo 1.1", "child 1.0", "bar 1.0")
+      end
+
+      it "does not treat a requirement on an excluded platform as an exact update target", :mri_only do
+        install_gemfile <<~G
+          source "https://gem.repo4"
+          gem "parent"
+          platforms :jruby do
+            gem "foo", "= 1.0"
+          end
+        G
+
+        expect(the_bundle).to include_gems("foo 1.0", "child 2.0")
+
+        build_repo4 do
+          build_gem "foo", "1.1" do |s|
+            s.add_dependency "child", "~> 1.0"
+          end
+        end
+
+        bundle "lock --update foo"
+
+        expect(lockfile).to include("foo (1.1)", "child (1.0)")
+      end
+    end
+
     it "does not downgrade direct dependencies unnecessarily" do
       build_repo4 do
         build_gem "redis", "4.8.1"

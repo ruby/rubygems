@@ -21,6 +21,78 @@ RSpec.describe Bundler::Definition do
     end
   end
 
+  describe "#additional_base_requirements_to_force_updates" do
+    before do
+      allow(Bundler::SharedHelpers).to receive(:find_gemfile) { bundled_app_gemfile }
+    end
+
+    let(:dependencies) { [Bundler::Dependency.new("foo", "= 1.0")] }
+    let(:unlocks) { ["foo"] }
+    let(:requirements) { { "foo" => Gem::Requirement.new(">= 1.1") } }
+    let(:base) { instance_double(Bundler::Resolver::Base, requirements: dependencies, base_requirements: requirements) }
+    let(:definition) { described_class.new(bundled_app_lock, dependencies, Bundler::SourceList.new, gems: unlocks) }
+
+    it "replaces a downgrade-prevention floor with the exact target without a full update" do
+      expect(definition).not_to receive(:new_resolver_for_full_update)
+
+      expect(definition.send(:additional_base_requirements_to_force_updates, base)).to eq(base)
+      expect(requirements.fetch("foo")).to eq(Gem::Requirement.new("= 1.0"))
+    end
+
+    it "pins every explicit target when all applicable requirements are exact" do
+      dependencies << Bundler::Dependency.new("bar", "= 2.0")
+      unlocks << "bar"
+      expect(definition).not_to receive(:new_resolver_for_full_update)
+
+      definition.send(:additional_base_requirements_to_force_updates, base)
+
+      expect(requirements).to eq("foo" => Gem::Requirement.new("= 1.0"), "bar" => Gem::Requirement.new("= 2.0"))
+    end
+
+    shared_examples "a full update" do
+      it "retains preliminary resolution without installing partial exact requirements" do
+        resolver = instance_double(Bundler::Resolver, start: [])
+        expect(definition).to receive(:new_resolver_for_full_update).and_return(resolver)
+
+        expect(definition.send(:additional_base_requirements_to_force_updates, base)).to eq(base)
+        expect(requirements).to eq("foo" => Gem::Requirement.new(">= 1.1"))
+      end
+    end
+
+    context "when a target has a nonexact requirement" do
+      let(:dependencies) { [Bundler::Dependency.new("foo", ">= 1.0")] }
+
+      include_examples "a full update"
+    end
+
+    context "when an exact target is unlocked with an indirect dependency" do
+      let(:unlocks) { %w[foo child] }
+
+      include_examples "a full update"
+    end
+
+    context "when an exact target has an explicit source" do
+      before do
+        definition.dependencies.first.source = Bundler::Source::Rubygems.new("remotes" => ["https://gem.repo1"])
+      end
+
+      include_examples "a full update"
+    end
+
+    context "when overrides are active" do
+      before { definition.overrides = [Bundler::Override.new("child", :version, "= 2.0")] }
+
+      include_examples "a full update"
+    end
+
+    context "when Bundler itself is an explicit target" do
+      let(:dependencies) { [Bundler::Dependency.new("bundler", "= 2.0")] }
+      let(:unlocks) { ["bundler"] }
+
+      include_examples "a full update"
+    end
+  end
+
   describe "#lock" do
     before do
       allow(Bundler::SharedHelpers).to receive(:find_gemfile) { bundled_app_gemfile }
