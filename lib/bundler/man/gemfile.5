@@ -40,6 +40,28 @@ source "https://user:password@gems\.example\.com"
 .IP "" 0
 .P
 Credentials in the source URL will take precedence over credentials set using \fBconfig\fR\.
+.SS "OVERRIDES"
+A \fBsource\fR may declare one or more \fBoverrides\fR\. An override is a secondary RubyGems\-compatible repository that supplies alternate builds (for example, prebuilt binaries) of gems that already exist in the primary source\.
+.IP "" 4
+.nf
+source "https://rubygems\.org",
+       overrides: ["https://build\-farm\.example\.com"]
+.fi
+.IP "" 0
+.P
+Overrides are consulted only for gems that are also present in the primary source \(em they cannot introduce new gems\. If an override publishes a gem that the primary source does not contain in any version, Bundler raises an error, since this indicates the override and primary source are misconfigured\.
+.P
+When an override publishes a spec whose name and version match one in the primary source, that spec is preferred for installation if it is compatible with the local platform\. If no matching build is available, or fetching the override fails (authentication, SSL, network), Bundler falls back to the primary source\.
+.P
+Overrides are recorded in \fBGemfile\.lock\fR under \fBoverride:\fR lines:
+.IP "" 4
+.nf
+GEM
+  remote: https://rubygems\.org/
+  override: https://build\-farm\.example\.com/
+  specs:
+.fi
+.IP "" 0
 .SH "RUBY"
 If your application requires a specific Ruby version or engine, specify your requirements using the \fBruby\fR method, with the following arguments\. All parameters are \fBOPTIONAL\fR unless otherwise specified\.
 .SS "VERSION (required)"
