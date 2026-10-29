@@ -471,6 +471,26 @@ class Gem::Installer
     end
   end
 
+  ##
+  # Checks if +bin_path+ should be wrapped if we're generating wrappers
+  #
+  # If the first line of the file is a shebang check if it mentions ruby and
+  # return false if it doesn't (don't wrap non-ruby executable)
+  #
+  # If the first line is not a shebang, check if it contains the magic string:
+  # "rubygems: no-wrap" and return false if it does (don't wrap if no-wrap was
+  # requested)
+  #
+  # Otherwise wrap
+
+  def wrappable_executable?(bin_path)
+    File.open bin_path, 'r' do |f|
+      line1 = f.gets
+      break line1['ruby'] if line1.start_with?('#!') # if the line is a shebang check for ruby
+      !line1['rubygems: no-wrap'] # check for magic string
+    end
+  end
+
   def generate_bin # :nodoc:
     executables = spec.executables
     return if executables.nil? || executables.empty?
@@ -499,7 +519,7 @@ class Gem::Installer
 
       check_executable_overwrite filename
 
-      if @wrappers
+      if @wrappers && wrappable_executable?(bin_path)
         generate_bin_script filename, @bin_dir
       else
         generate_bin_symlink filename, @bin_dir
