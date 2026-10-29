@@ -161,6 +161,10 @@ class Gem::Dependency
     @type ||= :runtime
   end
 
+  def deconstruct_keys(keys)
+    { name: @name, type: type, requirement: requirement, prerelease: prerelease? }
+  end
+
   def runtime?
     @type == :runtime || !@type
   end

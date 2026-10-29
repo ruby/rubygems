@@ -410,4 +410,37 @@ class TestGemDependency < Gem::TestCase
     assert_equal dep("a", " >= 1.a").identity, :abs_latest
     assert_equal dep("a").identity, :latest
   end
+
+  def test_deconstruct_keys
+    dependency = dep("rails", "~> 7.0", :runtime)
+    keys = dependency.deconstruct_keys(nil)
+    assert_equal "rails", keys[:name]
+    assert_equal :runtime, keys[:type]
+    assert_equal Gem::Requirement.new("~> 7.0"), keys[:requirement]
+    assert_equal false, keys[:prerelease]
+  end
+
+  def test_pattern_matching_runtime
+    dependency = dep("rails", ">= 6.0", :runtime)
+    result =
+      case dependency
+      in type: :runtime, name: "rails"
+        "matched"
+      else
+        "no match"
+      end
+    assert_equal "matched", result
+  end
+
+  def test_pattern_matching_development
+    dependency = dep("rspec", "~> 3.0", :development)
+    result =
+      case dependency
+      in type: :development, name:
+        name
+      else
+        "no match"
+      end
+    assert_equal "rspec", result
+  end
 end
