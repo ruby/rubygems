@@ -102,7 +102,10 @@ module Gem::LocalRemoteOptions
     accept_uri_http
 
     add_option(:"Local/Remote", "-s", "--source URL", Gem::URI::HTTP,
-               "Append URL to list of remote gem sources") do |source, options|
+               "Append URL to list of remote gem sources.",
+               "Gems named on the command line are installed",
+               "only from these sources; their dependencies",
+               "may still come from the default sources") do |source, options|
       source << "/" unless source.end_with?("/")
 
       if options.delete :sources_cleared
@@ -110,6 +113,12 @@ module Gem::LocalRemoteOptions
       else
         Gem.sources << source unless Gem.sources.include?(source)
       end
+
+      # Remember the sources that were explicitly requested on the command line
+      # so that resolution of the gems named on the command line can be
+      # restricted to them (their dependencies may still come from other
+      # sources). See Gem::Resolver::InstallerSet#add_always_install.
+      (options[:sources] ||= []) << source unless options[:sources]&.include?(source)
     end
   end
 

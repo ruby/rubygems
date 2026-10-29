@@ -33,6 +33,13 @@ class Gem::Resolver::InstallerSet < Gem::Resolver::Set
   attr_accessor :force # :nodoc:
 
   ##
+  # Sources explicitly requested via `--source`. When set, gems added to the
+  # always_install list (i.e. the gems named on the command line) must be found
+  # in one of these sources rather than falling back to the default sources.
+
+  attr_accessor :explicit_sources # :nodoc:
+
+  ##
   # Creates a new InstallerSet that will look for gems in +domain+.
 
   def initialize(domain)
@@ -43,6 +50,7 @@ class Gem::Resolver::InstallerSet < Gem::Resolver::Set
     @f = Gem::SpecFetcher.fetcher
 
     @always_install      = []
+    @explicit_sources    = nil
     @ignore_dependencies = false
     @ignore_installed    = false
     @local               = {}
@@ -59,7 +67,7 @@ class Gem::Resolver::InstallerSet < Gem::Resolver::Set
   def add_always_install(dependency)
     request = Gem::Resolver::DependencyRequest.new dependency, nil
 
-    found = find_all request
+    found = find_all_for_always_install request
 
     found.delete_if do |s|
       s.version.prerelease? && !s.local?
@@ -242,6 +250,26 @@ class Gem::Resolver::InstallerSet < Gem::Resolver::Set
   end
 
   private
+
+  ##
+  # Like #find_all, but when sources were explicitly requested via `--source`,
+  # the gem named on the command line must be found in one of those sources
+  # rather than silently falling back to the default sources. Dependencies are
+  # unaffected, since they are not resolved through #add_always_install and may
+  # still come from any configured source.
+
+  def find_all_for_always_install(request)
+    return find_all(request) if @explicit_sources.nil? || @explicit_sources.empty?
+
+    original_remote_set = @remote_set
+    @remote_set = Gem::Resolver::BestSet.new Gem::SourceList.from(@explicit_sources)
+    @remote_set.prerelease = original_remote_set.prerelease
+    begin
+      find_all(request)
+    ensure
+      @remote_set = original_remote_set
+    end
+  end
 
   def metadata_satisfied?(spec)
     spec.required_ruby_version.satisfied_by?(Gem.ruby_version) &&
