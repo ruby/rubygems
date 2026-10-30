@@ -31,6 +31,7 @@ lib/bundler/cli/common.rb
 lib/bundler/cli/config.rb
 lib/bundler/cli/console.rb
 lib/bundler/cli/doctor.rb
+lib/bundler/cli/doctor/cooldown.rb
 lib/bundler/cli/doctor/diagnose.rb
 lib/bundler/cli/doctor/ssl.rb
 lib/bundler/cli/exec.rb

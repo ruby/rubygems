@@ -29,5 +29,18 @@ module Bundler
       require_relative "doctor/ssl"
       SSL.new(options).run
     end
+
+    desc "cooldown [OPTIONS]", "Checks the locked gems against the cooldown setting"
+    long_desc <<-D
+      Cooldown fetches the publish time of each gem locked in the lockfile and checks it against
+      the cooldown that applies to the gem's source. If any locked gem was published inside the
+      cooldown window, Bundler prints them and exits status 1. Otherwise, Bundler prints a success
+      message and exits with a status of 0. The lockfile is never changed.
+    D
+    method_option "cooldown", type: :numeric, banner: "Check against a cooldown of N days instead of the configured one."
+    def cooldown
+      require_relative "doctor/cooldown"
+      Cooldown.new(options).run
+    end
   end
 end

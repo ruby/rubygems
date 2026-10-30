@@ -90,7 +90,7 @@ The following is a list of all configuration keys and their purpose\. You can le
 .IP
 The effective cooldown for any given gem is resolved from three layers, highest precedence first:
 .IP "1." 4
-CLI flag \fB\-\-cooldown N\fR on \fBinstall\fR, \fBupdate\fR, \fBadd\fR, \fBcache\fR, \fBlock\fR, and \fBoutdated\fR\.
+CLI flag \fB\-\-cooldown N\fR on \fBinstall\fR, \fBupdate\fR, \fBadd\fR, \fBcache\fR, \fBlock\fR, \fBoutdated\fR, and \fBdoctor cooldown\fR\.
 .IP "2." 4
 This setting (\fBbundle config set cooldown N\fR or \fBBUNDLE_COOLDOWN=N\fR)\.
 .IP "3." 4
@@ -106,6 +106,8 @@ The value must be a non\-negative integer\. \fB\-\-cooldown\fR rejects anything 
 Cooldown filtering depends on the gem server providing a per\-version \fBcreated_at\fR timestamp in the v2 compact\-index format\. Versions without that metadata \- older gem servers, historical entries that predate the v2 cutover on \fBrubygems\.org\fR, or private registries that still emit the v1 format \- are treated as outside the cooldown window and remain resolvable\. If you rely on cooldown for supply\-chain protection, confirm that the gem server emits \fBcreated_at\fR in its \fB/info/<gem>\fR responses\.
 .IP
 A \fBcreated_at\fR timestamp is read as UTC when it carries no time zone offset\. \fBrubygems\.org\fR always sends one, but a third\-party server that omits it would otherwise shift the cooldown window by the offset of whatever machine runs bundler\.
+.IP
+Versions already in the lockfile are never excluded, so a cooldown never breaks a working lockfile\. To check that no locked version is inside the cooldown window, for example in CI, run \fBbundle doctor cooldown\fR\. See bundle\-doctor(1)\.
 .IP "\(bu" 4
 \fBcredential_store\fR (\fBBUNDLE_CREDENTIAL_STORE\fR): Experimental: store and read host credentials (the values otherwise set via \fBbundle config set <host> <user:pass>\fR) in a credential store instead of the plain text config file\. Set it to \fBtrue\fR to use the operating system's native store (macOS Keychain, Linux Secret Service, Windows Credential Manager) when one is available on this platform, or to the name of a backend provided by a third\-party gem, such as \fB1password\fR\. Falls back to the config file when the store is unavailable or fails, warning that the credential was written in plain text\. Defaults to false\. Credentials already written to the config file are not migrated automatically; re\-run \fBbundle config set <host> <user:pass>\fR with the setting enabled to move each one into the store\. Being experimental, the name and behavior of this setting may change in a future release\.
 .IP
