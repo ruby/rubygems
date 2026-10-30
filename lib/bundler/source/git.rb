@@ -148,6 +148,11 @@ module Bundler
         git_proxy.revision = nil
         options["revision"] = nil
 
+        # The checkout directory is named after the revision. If it was already
+        # computed for the locked revision, forget it, or the new revision gets
+        # checked out into the old revision's directory.
+        set_install_path!(nil) unless local?
+
         @unlocked = true
       end
 

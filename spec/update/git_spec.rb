@@ -122,6 +122,29 @@ RSpec.describe "bundle update" do
       expect(the_bundle).to include_gems "foo 1.1"
     end
 
+    it "checks out the new revision in its own directory when updating conservatively" do
+      build_git "foo", path: lib_path("foo") do |s|
+        s.add_dependency "myrack"
+      end
+
+      install_gemfile <<-G
+        source "https://gem.repo1"
+        gem "foo", :git => "#{lib_path("foo")}"
+      G
+
+      old_revision = revision_for(lib_path("foo"))
+      old_checkout = default_bundle_path("bundler/gems/foo-#{old_revision[0..11]}")
+
+      update_git "foo", path: lib_path("foo") do |s|
+        s.write "lib/foo.rb", "FOO = '1.1'"
+      end
+
+      bundle "update foo --conservative"
+
+      expect(the_bundle).to include_gems "foo 1.1"
+      expect(git("rev-parse HEAD", old_checkout).strip).to eq(old_revision)
+    end
+
     it "notices when you change the repo url in the Gemfile" do
       build_git "foo", path: lib_path("foo_one")
       build_git "foo", path: lib_path("foo_two")
