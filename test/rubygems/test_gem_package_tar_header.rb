@@ -76,17 +76,28 @@ class TestGemPackageTarHeader < Gem::Package::TarTestCase
   end
 
   def test_initialize_typeflag
-    header = {
-      mode: "",
-      name: "",
-      prefix: "",
-      size: "",
-      typeflag: "",
-    }
+    ["", "\0", nil].each do |typeflag|
+      header = {
+        mode: "",
+        name: "",
+        prefix: "",
+        size: "",
+        typeflag: typeflag,
+      }
 
-    tar_header = Gem::Package::TarHeader.new header
+      tar_header = Gem::Package::TarHeader.new header
 
-    assert_equal "0", tar_header.typeflag
+      assert_equal "0", tar_header.typeflag
+    end
+  end
+
+  def test_from_typeflag
+    raw = @tar_header.to_s.dup
+    raw.setbyte(156, 0)
+    assert_equal "0", Gem::Package::TarHeader.from(StringIO.new(raw)).typeflag
+
+    space_header = Gem::Package::TarHeader.new(name: "x", mode: 0o644, size: 0, prefix: "", typeflag: " ")
+    assert_equal " ", Gem::Package::TarHeader.from(StringIO.new(space_header.to_s)).typeflag
   end
 
   def test_empty_eh

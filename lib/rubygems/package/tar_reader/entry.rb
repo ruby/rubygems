@@ -11,6 +11,9 @@
 # Class for reading entries out of a tar file
 
 class Gem::Package::TarReader::Entry
+  SUPPORTED_TYPEFLAGS = ["0", "2", "5"].freeze
+  private_constant :SUPPORTED_TYPEFLAGS
+
   ##
   # Creates a new tar entry for +header+ that will be read from +io+
   # If a block is given, the entry is yielded and then closed.
@@ -34,6 +37,11 @@ class Gem::Package::TarReader::Entry
   # Creates a new tar entry for +header+ that will be read from +io+
 
   def initialize(header, io)
+    unless SUPPORTED_TYPEFLAGS.include?(header.typeflag)
+      raise Gem::Package::TarInvalidError,
+            "tar header has unsupported typeflag #{header.typeflag.inspect}"
+    end
+
     @closed = false
     @header = header
     @io = io
