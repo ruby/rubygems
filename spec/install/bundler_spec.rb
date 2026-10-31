@@ -59,10 +59,7 @@ RSpec.describe "bundle install" do
       nice_error = <<~E.strip
         Could not find compatible versions
 
-        Because rails >= 3.0 depends on bundler >= 0.9.0
-          and the current Bundler version (#{Bundler::VERSION}) does not satisfy bundler >= 0.9.0, < 1.A,
-          rails >= 3.0 requires bundler >= 1.A.
-        So, because Gemfile depends on rails = 3.0
+        Because the current Bundler version (#{Bundler::VERSION}) does not satisfy bundler ~> 0.8
           and Gemfile depends on bundler ~> 0.8,
           version solving has failed.
 

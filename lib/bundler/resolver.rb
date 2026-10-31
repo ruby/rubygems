@@ -308,6 +308,9 @@ module Bundler
 
       locked_requirement = base_requirements[name]
       results = filter_matching_specs(results, locked_requirement) if locked_requirement
+      if package.top_level? && @base.overrides.empty?
+        results = filter_matching_specs(results, package.dependency.requirement)
+      end
 
       results.group_by(&:version).reduce([]) do |groups, (version, specs)|
         platform_specs = package.platform_specs(specs)

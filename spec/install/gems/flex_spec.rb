@@ -196,9 +196,9 @@ RSpec.describe "bundle flex_install" do
       nice_error = <<~E.strip
         Could not find compatible versions
 
-        Because myrack-obama >= 2.0 depends on myrack = 1.2
+        Because every version of myrack-obama depends on myrack = 1.2
           and myrack = 1.2 could not be found in rubygems repository https://gem.repo2/ or installed locally,
-          myrack-obama >= 2.0 cannot be used.
+          myrack-obama cannot be used.
         So, because Gemfile depends on myrack-obama = 2.0,
           version solving has failed.
       E
