@@ -14,6 +14,28 @@ module Bundler
       injector.remove(Bundler.default_gemfile, Bundler.default_lockfile)
     end
 
+    # Rewrites the version requirements of gems already declared in the
+    # Gemfile (and the files it evaluates), keeping options, comments and
+    # layout. See GemfileRequirementRewriter.
+    #
+    # The cached Bundler.definition is left as it is, since resetting it with
+    # Bundler.reset_paths! would also drop the settings given on the command
+    # line; build a new one (e.g. with `Bundler.definition(gems: names)`)
+    # before using it again.
+    # @param requirements [Hash{String => String, Array<String>}] gem name to new requirement(s)
+    #   (e.g. `{ "rails" => ">= 8.0.0" }` or `{ "rails" => ["> 5.0.0", "< 5.1.1"] }`)
+    # @return [Array<String>] names of gems whose Gemfile entries were rewritten
+    def self.update_requirements(requirements)
+      updated = Bundler.definition.gemfiles.flat_map do |path|
+        rewriter = GemfileRequirementRewriter.new(Bundler.read_file(path))
+        names = requirements.keys.select {|name| rewriter.declares?(name) }
+        SharedHelpers.filesystem_access(path) {|p| File.write(p, rewriter.rewrite(requirements)) } if names.any?
+        names
+      end
+
+      updated.uniq
+    end
+
     def initialize(deps, options = {})
       @deps = deps
       @options = options
