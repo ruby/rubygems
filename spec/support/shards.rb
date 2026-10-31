@@ -145,6 +145,7 @@ module Spec
       ],
       shard_d: [
         "spec/bundler/cli/exec_spec.rb",
+        "spec/install/gemfile/path_extensions_spec.rb",
         "spec/bundler/rubygems_ext_spec.rb",
         "spec/bundler/resolver/cooldown_spec.rb",
         "spec/install/cooldown_spec.rb",
