@@ -68,6 +68,7 @@ module Bundler
     # Bundler, so a lockfile still BUNDLED WITH 4.0 would never get its
     # overrides recorded while the resolution stays the same.
     KNOWN_SECTIONS = (SECTIONS_BY_VERSION_INTRODUCED.values.flatten + [OVERRIDES]).freeze
+    KNOWN_SECTION_LINE = /^(?:#{KNOWN_SECTIONS.map {|s| Regexp.escape(s) }.join("|")})\r?$/
 
     ENVIRONMENT_VERSION_SECTIONS = [BUNDLED, RUBY].freeze
     deprecate_constant(:ENVIRONMENT_VERSION_SECTIONS)
@@ -125,8 +126,7 @@ module Bundler
           "Run `git checkout HEAD -- #{@lockfile_path}` first to get a clean lock."
       end
 
-      @valid = lockfile.strip.empty? ||
-               lockfile.split(/(?:\r?\n)+/).any? {|l| KNOWN_SECTIONS.include?(l) }
+      @valid = lockfile.strip.empty? || lockfile.match?(KNOWN_SECTION_LINE)
 
       unless @valid
         SharedHelpers.feature_deprecated!(
@@ -136,9 +136,9 @@ module Bundler
         )
       end
 
-      lockfile.split(/((?:\r?\n)+)/) do |line|
-        # split alternates between the line and the following whitespace
-        next @pos.advance!(line) if line.match?(/^\s*$/)
+      lockfile.each_line do |raw_line|
+        line = raw_line.chomp
+        next @pos.advance!(raw_line) if line.match?(/\A\s*\z/)
 
         if SOURCE.include?(line)
           @parse_method = :parse_source
@@ -166,7 +166,7 @@ module Bundler
         elsif @parse_method
           send(@parse_method, line)
         end
-        @pos.advance!(line)
+        @pos.advance!(raw_line)
       end
 
       @spec_names_by_source.each {|source, names| source.add_dependency_names(names) }
