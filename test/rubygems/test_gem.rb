@@ -1807,6 +1807,22 @@ class TestGem < Gem::TestCase
     assert_nil              Gem.find_unresolved_default_spec("README.md")
   end
 
+  def test_register_default_spec_activates_spec_whose_file_is_loaded
+    Gem.clear_default_specs
+
+    load_path = Gem.send(:default_gem_load_paths).first
+    loaded = Gem::Specification.new("loaded_default", "1.0") {|s| s.files = ["lib/loaded_default.rb"] }
+    elsewhere = Gem::Specification.new("elsewhere_default", "1.0") {|s| s.files = ["lib/elsewhere_default.rb"] }
+    $LOADED_FEATURES << File.join(load_path, "loaded_default.rb")
+    $LOADED_FEATURES << File.join(@tempdir, "elsewhere_default.rb")
+
+    Gem.register_default_spec loaded
+    Gem.register_default_spec elsewhere
+
+    assert_equal loaded, Gem.loaded_specs["loaded_default"]
+    assert_nil Gem.loaded_specs["elsewhere_default"]
+  end
+
   def test_register_default_spec_old_style_with_folder_starting_with_lib
     Gem.clear_default_specs
 

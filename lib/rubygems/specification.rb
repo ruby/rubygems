@@ -867,10 +867,11 @@ class Gem::Specification < Gem::BasicSpecification
   # Loads the default specifications. It should be called only once.
 
   def self.load_defaults
+    loaded_features = Gem.loaded_default_gem_features
     each_spec([Gem.default_specifications_dir]) do |spec|
       # #load returns nil if the spec is bad, so we just ignore
       # it at this stage
-      Gem.register_default_spec(spec)
+      Gem.register_default_spec(spec, loaded_features)
     end
   end
 
