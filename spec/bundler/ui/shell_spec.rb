@@ -19,6 +19,17 @@ RSpec.describe Bundler::UI::Shell do
     end
   end
 
+  describe "wrapping" do
+    it "wraps a long message even when it is the first thing printed" do
+      ruby <<~R, env: { "THOR_COLUMNS" => "40" }
+        require "bundler"
+        Bundler::UI::Shell.new.info("word " * 20, wrap: true)
+      R
+
+      expect(out).to eq(("word " * 8).strip + "\n" + ("word " * 8).strip + "\n" + ("word " * 4).strip)
+    end
+  end
+
   describe "#confirm" do
     before { subject.level = "confirm" }
     it "prints to stdout" do

@@ -779,6 +779,19 @@ RSpec.describe "Bundler.setup" do
     expect(out).to eq("[]\ntrue")
   end
 
+  it "does not load Thor when nothing is printed" do
+    install_gemfile <<-G
+      source "https://gem.repo1"
+      gem "myrack"
+    G
+
+    run <<-R
+      puts $LOADED_FEATURES.grep(%r{bundler/vendor/thor}).inspect
+    R
+
+    expect(out).to eq("[]")
+  end
+
   it "does not load all gemspecs" do
     install_gemfile <<-G
       source "https://gem.repo1"
