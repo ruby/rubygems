@@ -44,7 +44,15 @@ module Bundler
         until remaining_gems.empty?
           log_specs { "Looking up gems #{remaining_gems.inspect}" }
           deps = fetch_gem_infos(remaining_gems).flatten(1)
-          next_gems = deps.flat_map {|d| d[Gem::CompactIndexClient::INFO_DEPS].flat_map(&:first) }.uniq
+          eligible = if metadata_requirements
+            deps.select do |dep|
+              requirement = metadata_requirements[dep[0]]
+              !requirement || requirement.satisfied_by?(Gem::Version.new(dep[1]))
+            end
+          else
+            deps
+          end
+          next_gems = eligible.flat_map {|d| d[Gem::CompactIndexClient::INFO_DEPS].flat_map(&:first) }.uniq
           deps.each {|dep| gem_info << dep }
           complete_gems.concat(deps.map(&:first)).uniq!
           remaining_gems = next_gems - complete_gems

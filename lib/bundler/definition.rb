@@ -1333,6 +1333,16 @@ module Bundler
     end
 
     def find_source_requirements
+      if default_source.is_a?(Source::Rubygems)
+        default_source.metadata_requirements = {}
+        if @overrides.empty?
+          applicable = dependencies.select {|dep| dep.source.nil? && dep.gem_platforms(@platforms) == @platforms }
+          applicable.group_by(&:name).each do |name, deps|
+            default_source.metadata_requirements[name] = deps.first.requirement if deps.one?
+          end
+        end
+      end
+
       preload_git_sources
 
       # Only safe to exclude when locked_requirements (merged below) backfills the gap.

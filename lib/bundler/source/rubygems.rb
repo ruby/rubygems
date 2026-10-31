@@ -12,6 +12,7 @@ module Bundler
       REQUIRE_MUTEX = Mutex.new
 
       attr_accessor :remotes, :remote_cooldowns
+      attr_accessor :metadata_requirements
 
       def initialize(options = {})
         @options = options

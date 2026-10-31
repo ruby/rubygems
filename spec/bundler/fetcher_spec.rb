@@ -284,18 +284,31 @@ RSpec.describe Bundler::Fetcher do
     let(:compact_index) { double(Bundler::Fetcher::CompactIndex, available?: true, api_fetcher?: true) }
     let(:dependency)    { double(Bundler::Fetcher::Dependency, available?: true, api_fetcher?: true) }
     let(:index)         { double(Bundler::Fetcher::Index, available?: true, api_fetcher?: false) }
+    let(:source) { double(Bundler::Source::Rubygems, metadata_requirements: nil) }
 
     before do
       allow(Bundler::Fetcher::CompactIndex).to receive(:new).and_return(compact_index)
       allow(Bundler::Fetcher::Dependency).to receive(:new).and_return(dependency)
       allow(Bundler::Fetcher::Index).to receive(:new).and_return(index)
+      [compact_index, dependency, index].each do |backend|
+        allow(backend).to receive(:metadata_requirements=)
+      end
     end
 
     it "picks the first fetcher that works" do
       expect(compact_index).to receive(:specs).with("name").and_return([["name", "1.2.3", "ruby"]])
       expect(dependency).not_to receive(:specs)
       expect(index).not_to receive(:specs)
-      fetcher.specs_with_retry("name", double(Bundler::Source::Rubygems))
+      fetcher.specs_with_retry("name", source)
+    end
+
+    it "passes metadata requirements to the compact index backend" do
+      requirements = { "name" => Gem::Requirement.new("= 1.2.3") }
+      allow(source).to receive(:metadata_requirements).and_return(requirements)
+      expect(compact_index).to receive(:metadata_requirements=).with(requirements)
+      expect(compact_index).to receive(:specs).with("name").and_return([["name", "1.2.3", "ruby"]])
+
+      fetcher.specs_with_retry("name", source)
     end
 
     context "when APIs are not available" do
@@ -309,7 +322,7 @@ RSpec.describe Bundler::Fetcher do
         expect(dependency).not_to receive(:specs)
         expect(index).to receive(:specs).with("name").and_return([["name", "1.2.3", "ruby"]])
 
-        fetcher.specs_with_retry("name", double(Bundler::Source::Rubygems))
+        fetcher.specs_with_retry("name", source)
       end
     end
   end
