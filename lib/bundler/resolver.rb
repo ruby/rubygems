@@ -507,14 +507,11 @@ module Bundler
     # `--update` targets, and the from-scratch retries after a conflict unlocks a
     # gem. In those passes the locked version is the only candidate, so filtering
     # it out makes an unrelated operation impossible whenever every published
-    # version matching the requirement sits inside the cooldown window.
-    #
-    # Gems named on a `bundle update GEM` command are the exception: the user
-    # asked to move them, so they stay subject to cooldown and a locked-but-fresh
-    # release is pushed back to an older one (or fails loudly when none exists).
+    # version matching the requirement sits inside the cooldown window. Gems
+    # named on a `bundle update GEM` command get no exception: an update command
+    # must never downgrade a gem.
     def locked_by_lockfile?(spec)
       return false unless defined?(@base) && @base
-      return false if @base.explicitly_unlocked?(spec.name)
       @base.locked_specs[spec.name].any? {|locked| locked.version == spec.version }
     end
 
