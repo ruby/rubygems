@@ -21,7 +21,7 @@ RSpec.describe "process lock spec" do
       expect(the_bundle).to include_gems "myrack 1.0"
     end
 
-    it "keeps excluding late arrivals after the lock is handed over to a waiting process" do
+    it "keeps excluding late arrivals after the lock is handed over to a waiting process", rubygems: ">= 4.0.24" do
       events = Queue.new
       release_waiter = Queue.new
 
