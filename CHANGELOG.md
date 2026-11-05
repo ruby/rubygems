@@ -2,6 +2,42 @@
 
 Bundler's changelog before 4.0.0, when it was versioned separately from RubyGems, is in [doc/CHANGELOG-bundler-2.x.md](https://github.com/ruby/rubygems/blob/master/doc/CHANGELOG-bundler-2.x.md).
 
+## 4.0.24 / 2026-11-05
+
+### RubyGems
+
+#### Enhancements:
+
+* Installs bundler 4.0.24 as a default gem.
+
+#### Bug fixes:
+
+* Skip executable removal gracefully when the bin directory is missing. Pull request [#9963](https://github.com/ruby/rubygems/pull/9963) by Evan Li and Hiroshi SHIBATA
+* Fix file locks letting multiple processes in when lock files are removed. Pull request [#9930](https://github.com/ruby/rubygems/pull/9930) by Richard Janita and Hiroshi SHIBATA
+* Turn off echo before printing the password prompt. Pull request [#9969](https://github.com/ruby/rubygems/pull/9969) by Mike Dalessio
+
+#### Documentation:
+
+* [DOC] Fix link. Pull request [#10014](https://github.com/ruby/rubygems/pull/10014) by Burdette Lamar
+
+### Bundler
+
+#### Enhancements:
+
+* Read the Ruby version from mise's inline table form. Pull request [#9991](https://github.com/ruby/rubygems/pull/9991) by Hiroshi SHIBATA
+* Report which locked gems can't be materialized for the current platform. Pull request [#9738](https://github.com/ruby/rubygems/pull/9738) by Muhammad Moussa
+
+#### Bug fixes:
+
+* Fix `bundle exec` with no arguments for paths containing spaces. Pull request [#9996](https://github.com/ruby/rubygems/pull/9996) by Brandon Weiss
+* Respect enclosing platforms and install_if for gemspec development dependencies. Pull request [#9992](https://github.com/ruby/rubygems/pull/9992) by Hiroshi SHIBATA
+* Respect enclosing group and platforms for gemspec dependencies. Pull request [#9990](https://github.com/ruby/rubygems/pull/9990) by Denis Talakevich
+* Don't report locked gems in the cooldown summary. Pull request [#9981](https://github.com/ruby/rubygems/pull/9981) by Patrik Ragnarsson
+* Make `Bundler::Source::Rubygems#hash` agree with `eql?`. Pull request [#9983](https://github.com/ruby/rubygems/pull/9983) by Hiroshi SHIBATA
+* Add checksums after platform changes in `bundle lock`. Pull request [#9960](https://github.com/ruby/rubygems/pull/9960) by Farid Zakaria
+* Apply BUNDLE_RETRY to lazy gemspec downloads. Pull request [#9868](https://github.com/ruby/rubygems/pull/9868) by Islam Elsayed
+* Fix file locks letting multiple processes in when lock files are removed. Pull request [#9930](https://github.com/ruby/rubygems/pull/9930) by Richard Janita and Hiroshi SHIBATA
+
 ## 4.1.0.beta3 / 2026-10-28
 
 ### RubyGems
