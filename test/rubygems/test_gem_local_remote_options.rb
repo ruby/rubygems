@@ -92,6 +92,17 @@ class TestGemLocalRemoteOptions < Gem::TestCase
     assert_equal original_sources, Gem.sources
   end
 
+  def test_source_option_tracks_explicit_sources
+    @cmd.add_source_option
+
+    s1 = Gem::URI.parse "http://more-gems.example.com/"
+    s2 = Gem::URI.parse "http://other-gems.example.com/some_subdir"
+
+    @cmd.handle_options %W[--source #{s1} --source #{s2}]
+
+    assert_equal [s1.to_s, "#{s2}/"], @cmd.options[:sources]
+  end
+
   def test_short_source_option
     @cmd.add_source_option
 
