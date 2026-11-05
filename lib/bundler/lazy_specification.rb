@@ -8,7 +8,7 @@ module Bundler
     include MatchPlatform
     include ForcePlatform
 
-    attr_reader :name, :version, :platform, :materialization, :content_address
+    attr_reader :name, :version, :platform, :materialization, :content_addresses
     attr_accessor :source, :remote, :force_ruby_platform, :dependencies, :required_ruby_version, :required_rubygems_version
     attr_accessor :overrides
 
@@ -27,7 +27,14 @@ module Bundler
     alias_method :runtime_dependencies, :dependencies
 
     def self.from_spec(s)
-      lazy_spec = new(s.name, s.version, s.platform, s.source, content_address: s.content_address)
+      content_addresses = if s.is_a?(LazySpecification)
+        s.content_addresses
+      elsif s.content_address
+        { s.content_address => Gem::ContentAddress.ruby_abi_for(s.required_ruby_version) }
+      else
+        {}
+      end
+      lazy_spec = new(s.name, s.version, s.platform, s.source, content_addresses: content_addresses)
       lazy_spec.dependencies = s.runtime_dependencies
       lazy_spec.required_ruby_version = s.required_ruby_version
       lazy_spec.required_rubygems_version = s.required_rubygems_version
@@ -35,14 +42,14 @@ module Bundler
       lazy_spec
     end
 
-    def initialize(name, version, platform, source = nil, content_address: nil, **materialization_options)
+    def initialize(name, version, platform, source = nil, content_addresses: {}, **materialization_options)
       @name          = name
       @version       = version
       @dependencies  = []
       @required_ruby_version = Gem::Requirement.default
       @required_rubygems_version = Gem::Requirement.default
       @platform = platform || Gem::Platform::RUBY
-      @content_address = content_address
+      self.content_addresses = content_addresses
 
       @original_source = source
       @source = source
@@ -51,6 +58,14 @@ module Bundler
       @force_ruby_platform = default_force_ruby_platform
       @most_specific_locked_platform = nil
       @materialization = nil
+    end
+
+    def content_addresses=(addresses)
+      @content_addresses = addresses.sort_by {|address, ruby_abi| [ruby_abi.to_s, address] }.to_h
+    end
+
+    def content_addressed_full_names
+      @content_addresses.keys.map {|address| "#{@name}-#{@version}-#{address}" }
     end
 
     def missing?
@@ -66,9 +81,7 @@ module Bundler
     end
 
     def full_name
-      @full_name ||= if Gem::ContentAddress.content_addressed?(self, validate_ruby_abi: false)
-        "#{@name}-#{@version}-#{@content_address}"
-      elsif platform == Gem::Platform::RUBY
+      @full_name ||= if platform == Gem::Platform::RUBY
         "#{@name}-#{@version}"
       else
         "#{@name}-#{@version}-#{platform}"
@@ -84,7 +97,7 @@ module Bundler
     end
 
     def name_tuple
-      Gem::NameTuple.new(@name, @version, @platform, content_address: @content_address)
+      Gem::NameTuple.new(@name, @version, @platform)
     end
 
     def ==(other)
@@ -119,16 +132,6 @@ module Bundler
       @name == dependency.name && effective_requirement.satisfied_by?(Gem::Version.new(@version))
     end
 
-    ##
-    # Assigns the content address parsed from the lockfile's CONTENT
-    # ADDRESSES section. The full name embeds the content address, so its
-    # memoization must be invalidated.
-
-    def content_address=(value)
-      @content_address = value
-      @full_name = nil
-    end
-
     def to_lock
       out = String.new
       out << "    #{lock_name}\n"
@@ -141,10 +144,12 @@ module Bundler
       out
     end
 
+    # Every gem this row may install: the platform gem and each content-addressed
+    # gem it lists, so a cache serves all the Rubies the lockfile covers.
     def materialize_for_cache
       source.remote!
 
-      materialize(self, &:first)
+      Array(materialize(self) {|specs| specs })
     end
 
     def materialized_for_installation(locked_platforms = nil)
@@ -205,7 +210,7 @@ module Bundler
     # Used for legacy lockfiles and as a fallback when the exact locked spec
     # is incompatible. Falls back to frozen bundle behavior if none match.
     def resolve_best_platform(specs, locked_platforms: nil)
-      specs = MatchPlatform.select_all_content_address_match(specs, content_address)
+      specs = MatchPlatform.select_all_content_address_match(specs, content_addresses)
 
       find_compatible_platform_spec(specs, locked_platforms: locked_platforms) || frozen_bundle_fallback(specs)
     end
