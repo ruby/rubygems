@@ -772,29 +772,13 @@ RSpec.describe "bundle install with the cooldown setting" do
       expect(the_bundle).to include_gems("ripe_gem 2.0.0")
     end
 
-    it "surfaces a cooldown hint when bundle update filters every candidate" do
+    it "surfaces a cooldown hint when cooldown filters every candidate" do
       gemfile <<-G
         source "https://gem.repo3"
         gem "ripe_gem"
       G
 
-      lockfile <<-L
-        GEM
-          remote: https://gem.repo3/
-          specs:
-            ripe_gem (1.0.0)
-
-        PLATFORMS
-          #{lockfile_platforms}
-
-        DEPENDENCIES
-          ripe_gem
-
-        BUNDLED WITH
-           #{Bundler::VERSION}
-      L
-
-      bundle "update ripe_gem --cooldown 99999", artifice: "compact_index_v2", raise_on_error: false
+      bundle "lock --cooldown 99999", artifice: "compact_index_v2", raise_on_error: false
 
       expect(err).to match(/excluded by the cooldown setting/)
       expect(err).to match(/--cooldown 0/)
@@ -858,7 +842,7 @@ RSpec.describe "bundle install with the cooldown setting" do
       expect(exitstatus).to eq(0)
     end
 
-    it "still applies cooldown and downgrades a gem that is updated explicitly" do
+    it "keeps an in-cooldown locked version of a gem that is updated explicitly" do
       gemfile <<-G
         source "https://gem.repo3"
         gem "ripe_gem"
@@ -882,7 +866,7 @@ RSpec.describe "bundle install with the cooldown setting" do
 
       bundle "update ripe_gem --cooldown 7", artifice: "compact_index_v2"
 
-      expect(the_bundle).to include_gems("ripe_gem 1.0.0")
+      expect(the_bundle).to include_gems("ripe_gem 2.0.0")
     end
 
     it "keeps an in-cooldown transitive dependency on bundle update --all" do
@@ -910,6 +894,64 @@ RSpec.describe "bundle install with the cooldown setting" do
       L
 
       bundle "update --all --cooldown 7", artifice: "compact_index_v2"
+
+      expect(the_bundle).to include_gems("parent 1.0.0", "child 2.0.0")
+    end
+
+    it "keeps an in-cooldown locked transitive dependency updated explicitly via bundle lock --update" do
+      gemfile <<-G
+        source "https://gem.repo3", cooldown: 7
+        gem "parent"
+      G
+
+      lockfile <<-L
+        GEM
+          remote: https://gem.repo3/
+          specs:
+            child (2.0.0)
+            parent (1.0.0)
+              child (>= 2.0.0)
+
+        PLATFORMS
+          #{lockfile_platforms}
+
+        DEPENDENCIES
+          parent
+
+        BUNDLED WITH
+           #{Bundler::VERSION}
+      L
+
+      bundle "lock --update child", artifice: "compact_index_v2"
+
+      expect(lockfile).to include("child (2.0.0)")
+    end
+
+    it "keeps an in-cooldown locked transitive dependency updated explicitly with --conservative" do
+      gemfile <<-G
+        source "https://gem.repo3", cooldown: 7
+        gem "parent"
+      G
+
+      lockfile <<-L
+        GEM
+          remote: https://gem.repo3/
+          specs:
+            child (2.0.0)
+            parent (1.0.0)
+              child (>= 2.0.0)
+
+        PLATFORMS
+          #{lockfile_platforms}
+
+        DEPENDENCIES
+          parent
+
+        BUNDLED WITH
+           #{Bundler::VERSION}
+      L
+
+      bundle "update child --conservative", artifice: "compact_index_v2"
 
       expect(the_bundle).to include_gems("parent 1.0.0", "child 2.0.0")
     end
@@ -1094,7 +1136,7 @@ RSpec.describe "bundle install with the cooldown setting" do
       expect(lockfile).not_to include("ripe_gem (2.0.0)")
     end
 
-    it "still applies cooldown and downgrades a gem explicitly updated via bundle lock --update" do
+    it "keeps an in-cooldown locked version of a gem explicitly updated via bundle lock --update" do
       gemfile <<-G
         source "https://gem.repo3", cooldown: 7
         gem "ripe_gem"
@@ -1118,8 +1160,7 @@ RSpec.describe "bundle install with the cooldown setting" do
 
       bundle "lock --update ripe_gem", artifice: "compact_index_v2"
 
-      expect(lockfile).to include("ripe_gem (1.0.0)")
-      expect(lockfile).not_to include("ripe_gem (2.0.0)")
+      expect(lockfile).to include("ripe_gem (2.0.0)")
     end
 
     it "excludes a version on every platform when a platform-specific build of it is inside the window" do
