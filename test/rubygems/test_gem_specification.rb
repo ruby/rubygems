@@ -764,6 +764,45 @@ end
                  spec.specification_version
   end
 
+  def test_self_from_yaml_ignores_unpermitted_ivars
+    yaml = <<-YAML
+--- !ruby/object:Gem::Specification
+name: unpermitted
+version: !ruby/object:Gem::Version
+  version: 1.0.0
+platform: ruby
+specification_version: 4
+extension_dir: /tmp/attacker-controlled
+full_gem_path: /tmp/attacker-controlled
+base_dir: /tmp/attacker-controlled
+loaded_from: /tmp/attacker-controlled
+    YAML
+
+    spec = Gem::Specification.from_yaml yaml
+
+    assert_equal "unpermitted", spec.name
+    refute_operator spec, :instance_variable_defined?, :@extension_dir
+    refute_operator spec, :instance_variable_defined?, :@full_gem_path
+    refute_operator spec, :instance_variable_defined?, :@base_dir
+    refute_operator spec, :instance_variable_defined?, :@loaded_from
+  end
+
+  def test_self_from_yaml_keeps_legacy_ivars
+    yaml = <<-YAML
+--- !ruby/object:Gem::Specification
+name: legacy
+version: !ruby/object:Gem::Version
+  version: 1.0.0
+platform: ruby
+specification_version: 1
+has_rdoc: true
+    YAML
+
+    spec = Gem::Specification.from_yaml yaml
+
+    assert_equal true, spec.instance_variable_get(:@has_rdoc)
+  end
+
   def test_self_from_yaml_cleans_up_Date_objects
     yaml = <<-YAML
 --- !ruby/object:Gem::Specification

@@ -2608,6 +2608,19 @@ class Gem::Specification < Gem::BasicSpecification
     false
   end
 
+  # Instance variables that may be set from a (possibly untrusted) .gem's
+  # metadata YAML. This is the set #encode_with emits (@@attributes plus
+  # "original_platform"), extended with legacy keys that older gems on
+  # disk still carry. Any other key is ignored so that crafted metadata
+  # cannot plant internal path ivars such as @extension_dir, @full_gem_path
+  # or @base_dir, which are later consumed by Gem::Installer (e.g.
+  # FileUtils.rm_rf spec.extension_dir).
+  PERMITTED_YAML_IVARS = (
+    @@attributes.map(&:to_s) +
+    %w[original_platform installed_by_version has_rdoc default_executable test_suite_file]
+  ).freeze
+  private_constant :PERMITTED_YAML_IVARS
+
   def yaml_initialize(tag, vals) # :nodoc:
     vals.each do |ivar, val|
       case ivar
@@ -2621,6 +2634,8 @@ class Gem::Specification < Gem::BasicSpecification
       when "requirements"
         self.requirements = val
       else
+        next unless PERMITTED_YAML_IVARS.include?(ivar)
+
         instance_variable_set "@#{ivar}", val
       end
     end
