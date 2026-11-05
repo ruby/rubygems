@@ -1,5 +1,21 @@
 # Changelog
 
+## 4.0.24 / 2026-11-05
+
+### Enhancements:
+
+* Installs bundler 4.0.24 as a default gem.
+
+### Bug fixes:
+
+* Skip executable removal gracefully when the bin directory is missing. Pull request [#9963](https://github.com/ruby/rubygems/pull/9963) by Evan Li and Hiroshi SHIBATA
+* Fix file locks letting multiple processes in when lock files are removed. Pull request [#9930](https://github.com/ruby/rubygems/pull/9930) by Richard Janita and Hiroshi SHIBATA
+* Turn off echo before printing the password prompt. Pull request [#9969](https://github.com/ruby/rubygems/pull/9969) by Mike Dalessio
+
+### Documentation:
+
+* [DOC] Fix link. Pull request [#10014](https://github.com/ruby/rubygems/pull/10014) by Burdette Lamar
+
 ## 4.0.23 / 2026-10-14
 
 ### Enhancements:

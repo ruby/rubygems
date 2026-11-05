@@ -1,5 +1,23 @@
 # Changelog
 
+## 4.0.24 / 2026-11-05
+
+### Enhancements:
+
+* Read the Ruby version from mise's inline table form. Pull request [#9991](https://github.com/ruby/rubygems/pull/9991) by Hiroshi SHIBATA
+* Report which locked gems can't be materialized for the current platform. Pull request [#9738](https://github.com/ruby/rubygems/pull/9738) by Muhammad Moussa
+
+### Bug fixes:
+
+* Fix `bundle exec` with no arguments for paths containing spaces. Pull request [#9996](https://github.com/ruby/rubygems/pull/9996) by Brandon Weiss
+* Respect enclosing platforms and install_if for gemspec development dependencies. Pull request [#9992](https://github.com/ruby/rubygems/pull/9992) by Hiroshi SHIBATA
+* Respect enclosing group and platforms for gemspec dependencies. Pull request [#9990](https://github.com/ruby/rubygems/pull/9990) by Denis Talakevich
+* Don't report locked gems in the cooldown summary. Pull request [#9981](https://github.com/ruby/rubygems/pull/9981) by Patrik Ragnarsson
+* Make `Bundler::Source::Rubygems#hash` agree with `eql?`. Pull request [#9983](https://github.com/ruby/rubygems/pull/9983) by Hiroshi SHIBATA
+* Add checksums after platform changes in `bundle lock`. Pull request [#9960](https://github.com/ruby/rubygems/pull/9960) by Farid Zakaria
+* Apply BUNDLE_RETRY to lazy gemspec downloads. Pull request [#9868](https://github.com/ruby/rubygems/pull/9868) by Islam Elsayed
+* Fix file locks letting multiple processes in when lock files are removed. Pull request [#9930](https://github.com/ruby/rubygems/pull/9930) by Richard Janita and Hiroshi SHIBATA
+
 ## 4.0.23 / 2026-10-14
 
 ### Enhancements:
