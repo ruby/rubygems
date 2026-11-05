@@ -370,7 +370,7 @@ RSpec.describe "bundle install with the cooldown setting" do
            #{Bundler::VERSION}
       L
 
-      bundle "install", artifice: "compact_index_v2"
+      bundle "install", artifice: "compact_index_cooldown"
 
       expect(out).to include("* child 2.0.0 (available in 6 days), resolved 1.0.0 instead")
       expect(out).not_to include("ripe_gem 2.0.0")
