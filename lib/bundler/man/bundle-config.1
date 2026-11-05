@@ -76,6 +76,10 @@ The following is a list of all configuration keys and their purpose\. You can le
 .IP "\(bu" 4
 \fBbin\fR (\fBBUNDLE_BIN\fR): If configured, \fBbundle binstubs\fR will install executables from gems in the bundle to the specified directory\. Otherwise it will create them in a \fBbin\fR directory relative to the Gemfile directory\. These executables run in Bundler's context\. If used, you might add this directory to your environment's \fBPATH\fR variable\. For instance, if the \fBrails\fR gem comes with a \fBrails\fR executable, \fBbundle binstubs\fR will create a \fBbin/rails\fR executable that ensures that all referred dependencies will be resolved using the bundled gems\.
 .IP "\(bu" 4
+\fBbuild_path_extensions\fR (\fBBUNDLE_BUILD_PATH_EXTENSIONS\fR): Whether Bundler should build the native extensions of gems sourced from a local path\. Off by default, since building them means compiling code out of a directory Bundler does not own\. It can also be set for a single gem, as \fBbuild_path_extensions\.<gem>\fR (\fBBUNDLE_BUILD_PATH_EXTENSIONS__<GEM>\fR), which takes precedence over the global setting\.
+.IP
+Extensions are built out of tree: the gem is copied into a directory under \fBBUNDLE_PATH\fR and compiled there, so that nothing is ever written into your checkout, and the build directory is put ahead of the gem's own \fBlib\fR on the load path\. A rebuild happens whenever the size or modification time of any file under an extension's directory changes, or when the flags configured through \fBbuild\.<gem>\fR change\. Run \fBbundle pristine <gem>\fR to force one\.
+.IP "\(bu" 4
 \fBcache_all\fR (\fBBUNDLE_CACHE_ALL\fR): Cache all gems, including path and git gems\. This needs to be explicitly before bundler 4, but will be the default on bundler 4\.
 .IP "\(bu" 4
 \fBcache_all_platforms\fR (\fBBUNDLE_CACHE_ALL_PLATFORMS\fR): Cache gems for all platforms\.
