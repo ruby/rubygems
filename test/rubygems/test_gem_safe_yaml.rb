@@ -1189,6 +1189,83 @@ class TestGemSafeYAML < Gem::TestCase
     assert_equal expected, yaml_load(yaml)
   end
 
+  def assert_folded_scalar_loads_like_psych(expected, yaml)
+    require "psych"
+    assert_equal expected, Psych.safe_load(yaml)
+    assert_equal expected, Gem::YAMLSerializer.load(yaml)
+  end
+
+  def test_load_folded_block_scalar
+    yaml = "text: >\n  folded\n  lines\n"
+    assert_folded_scalar_loads_like_psych({ "text" => "folded lines\n" }, yaml)
+  end
+
+  def test_load_folded_block_scalar_strip_trailing_newline
+    yaml = "text: >-\n  folded\n  lines\n\n\nother: value\n"
+    expected = { "text" => "folded lines", "other" => "value" }
+    assert_folded_scalar_loads_like_psych(expected, yaml)
+  end
+
+  def test_load_folded_block_scalar_keep_trailing_newlines
+    yaml = "text: >+\n  folded\n  lines\n\n\nother: value\n"
+    expected = { "text" => "folded lines\n\n\n", "other" => "value" }
+    assert_folded_scalar_loads_like_psych(expected, yaml)
+  end
+
+  def test_load_folded_block_scalar_empty_lines
+    yaml = "text: >-\n\n  first\n  paragraph\n\n  second\n\n\n  third\n"
+    expected = { "text" => "\nfirst paragraph\nsecond\n\nthird" }
+    assert_folded_scalar_loads_like_psych(expected, yaml)
+  end
+
+  def test_load_folded_block_scalar_more_indented_lines
+    yaml = "text: >\n  intro\n    code 1\n    code 2\n\n    code 3\n  outro\n  end\n"
+    expected = { "text" => "intro\n  code 1\n  code 2\n\n  code 3\noutro end\n" }
+    assert_folded_scalar_loads_like_psych(expected, yaml)
+  end
+
+  def test_load_folded_block_scalar_indentation_indicator
+    yaml = "text: >2-\n    indented\n   less\n  plain\n  text\n"
+    expected = { "text" => "  indented\n less\nplain text" }
+    assert_folded_scalar_loads_like_psych(expected, yaml)
+  end
+
+  def test_load_folded_block_scalar_as_sequence_item
+    yaml = "- >\n  folded\n  item\n- >-\n  stripped\n  item\n- plain\n"
+    expected = ["folded item\n", "stripped item", "plain"]
+    assert_folded_scalar_loads_like_psych(expected, yaml)
+  end
+
+  def test_load_folded_block_scalar_as_nested_mapping_value
+    yaml = "outer:\n  text: >\n    folded\n    lines\n  next: 1\nlast: 2\n"
+    expected = { "outer" => { "text" => "folded lines\n", "next" => 1 }, "last" => 2 }
+    assert_folded_scalar_loads_like_psych(expected, yaml)
+  end
+
+  def test_load_value_starting_with_greater_than_stays_plain_scalar
+    yaml = "version: >= 1\nitems:\n- >= 2\n  more\nother: value\n"
+    expected = { "version" => ">= 1", "items" => [">= 2 more"], "other" => "value" }
+    assert_equal expected, Gem::YAMLSerializer.load(yaml)
+  end
+
+  def test_load_gemrc_with_folded_value
+    yaml = <<~YAML
+      ---
+      gem: >-
+        --no-document
+        --env-shebang
+      install: --no-document
+      update: --no-document
+    YAML
+
+    expected = {
+      "gem" => "--no-document --env-shebang",
+      "install" => "--no-document",
+      "update" => "--no-document",
+    }
+    assert_folded_scalar_loads_like_psych(expected, yaml)
+  end
+
   def test_load_flow_array
     result = yaml_load("items: [a, b, c]")
     assert_equal ["a", "b", "c"], result["items"]
