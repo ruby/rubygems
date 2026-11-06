@@ -137,8 +137,11 @@ module Gem
 
         pos = indent
         if /\G&/.match?(line, indent) && (anchor = consume_anchor)
+          # An anchor alone on its line introduces the node on the following lines.
+          skip_blank_and_comments
+          return register_anchor(anchor, nil) if @lines.empty? || current_indent < base_indent
           line = @lines[0]
-          pos = indent_of(line)
+          indent = pos = indent_of(line)
         end
 
         if SEQUENCE_ENTRY_RE.match?(line, pos)
@@ -449,10 +452,15 @@ module Gem
       def consume_anchor
         line = @lines[0]
         stripped = line.lstrip
-        return nil unless stripped.start_with?("&") && stripped =~ /^&(\S+)\s+/
+        return nil unless stripped.start_with?("&") && stripped =~ /^&(\S+)(?:\s+|\z)/
 
         anchor = $1
-        @lines[0] = line.sub(/&#{Regexp.escape(anchor)}\s+/, "")
+        rest = line.sub(/&#{Regexp.escape(anchor)}\s*/, "")
+        if BLANK_OR_COMMENT_RE.match?(rest)
+          @lines.shift
+        else
+          @lines[0] = rest
+        end
         anchor
       end
 
@@ -464,14 +472,16 @@ module Gem
       end
 
       def consume_value_anchor(val)
-        return [nil, val] unless val =~ /^&(\S+)\s+/
+        return [nil, val] unless val =~ /^&(\S+)(?:\s+|\z)/
 
         anchor = $1
-        [anchor, val.sub(/^&#{Regexp.escape(anchor)}\s+/, "")]
+        [anchor, val.sub(/^&#{Regexp.escape(anchor)}\s*/, "")]
       end
 
       def register_anchor(name, node)
         if name
+          # An anchor on an empty value still has to resolve, to null.
+          node = Scalar.new(nil) if node.nil?
           @anchors[name] = node
           node.anchor = name if node.respond_to?(:anchor=)
         end
@@ -573,8 +583,9 @@ module Gem
           raise Psych::BadAlias, "exceeded maximum alias resolutions (#{MAX_ALIAS_RESOLUTIONS})"
         end
         unless @anchor_values.key?(node.name)
-          klass = defined?(Psych::AnchorNotDefined) ? Psych::AnchorNotDefined : Psych::BadAlias
-          raise klass, "An alias referenced an unknown anchor: #{node.name}"
+          # Psych::AnchorNotDefined builds the message from the anchor name itself.
+          raise Psych::AnchorNotDefined, node.name if defined?(Psych::AnchorNotDefined)
+          raise Psych::BadAlias, "An alias referenced an unknown anchor: #{node.name}"
         end
         @anchor_values.fetch(node.name)
       end

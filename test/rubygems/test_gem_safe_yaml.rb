@@ -271,6 +271,82 @@ class TestGemSafeYAML < Gem::TestCase
     Gem::SafeYAML.aliases_enabled = aliases_enabled
   end
 
+  # Psych is the oracle for anchors and aliases: the serializer must load the
+  # document to the same Ruby objects.
+  def assert_anchors_load_like_psych(yaml)
+    require "psych"
+
+    expected = Psych.safe_load(yaml, aliases: true)
+    assert_equal expected, Gem::YAMLSerializer.load(yaml, aliases: true)
+    expected
+  end
+
+  def test_anchor_on_block_mapping_value
+    yaml = <<~YAML
+      defaults: &defaults
+        verbose: true
+        sources: &sources
+        - https://gems.example.com
+      other: *defaults
+      mirrors: *sources
+    YAML
+
+    result = assert_anchors_load_like_psych(yaml)
+    assert_equal({ "verbose" => true, "sources" => ["https://gems.example.com"] }, result["other"])
+    assert_equal ["https://gems.example.com"], result["mirrors"]
+  end
+
+  def test_anchor_on_block_mapping_value_followed_by_comment
+    yaml = <<~YAML
+      defaults: &defaults # shared settings
+        verbose: true
+      other: *defaults
+    YAML
+
+    result = assert_anchors_load_like_psych(yaml)
+    assert_equal({ "verbose" => true }, result["other"])
+  end
+
+  def test_anchor_on_block_sequence_items
+    yaml = <<~YAML
+      - &first
+        name: first
+      - &second
+        - 1
+        - 2
+      - *first
+      - *second
+    YAML
+
+    result = assert_anchors_load_like_psych(yaml)
+    assert_equal [{ "name" => "first" }, [1, 2], { "name" => "first" }, [1, 2]], result
+  end
+
+  def test_anchor_on_root_block_collection
+    assert_equal({ "a" => 1, "b" => 2 }, assert_anchors_load_like_psych("&root\na: 1\nb: 2\n"))
+    assert_equal [1, 2], assert_anchors_load_like_psych("&root\n- 1\n- 2\n")
+  end
+
+  def test_anchor_on_empty_value_resolves_to_null
+    yaml = <<~YAML
+      a: &empty
+      b: *empty
+      c:
+      - &item
+      - *item
+      d: &last
+    YAML
+
+    result = assert_anchors_load_like_psych(yaml)
+    assert_equal({ "a" => nil, "b" => nil, "c" => [nil, nil], "d" => nil }, result)
+  end
+
+  def test_unknown_alias_error_names_the_anchor
+    expected_error = defined?(Psych::AnchorNotDefined) ? Psych::AnchorNotDefined : Psych::BadAlias
+    error = assert_raise(expected_error) { Gem::YAMLSerializer.load("a: *missing") }
+    assert_equal "An alias referenced an unknown anchor: missing", error.message
+  end
+
   def test_real_gemspec_rubygems_bundler
     yaml = <<~YAML
       --- !ruby/object:Gem::Specification
