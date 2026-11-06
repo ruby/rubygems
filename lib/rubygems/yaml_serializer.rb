@@ -24,15 +24,17 @@ module Gem
     class Parser
       # A plain (unquoted) mapping key followed by ":". "#" inside a key is
       # literal unless preceded by a space (which would start a comment).
-      MAPPING_KEY_RE = /\G((?:[^#:\s]|:[^ ])(?:[^#:]|:[^ ]|(?<=[^ ])#)*):(?:[ ]+(.*))?$/
+      # Like Psych, spaces and tabs may separate the ":" from the value.
+      MAPPING_KEY_RE = /\G((?:[^#:\s]|:[^ \t])(?:[^#:]|:[^ \t]|(?<=[^ ])#)*):(?:[ \t]+(.*))?$/
       # A quoted mapping key followed by ":". A whole-line quoted scalar
       # cannot match because its closing quote is at the end of the line.
-      QUOTED_KEY_RE = /\G("(?:[^"\\]|\\.)*"|'(?:[^']|'')*'):(?:[ ]+(.*))?$/
+      QUOTED_KEY_RE = /\G("(?:[^"\\]|\\.)*"|'(?:[^']|'')*'):(?:[ \t]+(.*))?$/
       # An entry of a flow sequence. A quoted entry may contain commas.
       FLOW_SEQUENCE_ENTRY_RE = /"(?:[^"\\]|\\.)*"|'(?:[^']|'')*'|[^,\s](?:[^,]*[^,\s])?/
       SEQUENCE_ENTRY_RE = /\G-(?: |\z)/
       RUBY_OBJECT_TAG_RE = %r{\G!ruby/object:}
       LSTRIP_BYTES = [0, 9, 10, 11, 12, 13, 32].freeze
+      UTF8_BOM_BYTES = [0xEF, 0xBB, 0xBF].freeze
       MAX_NESTING_DEPTH = 1_000
       NULL_SCALARS = %w[~ null].freeze
       BLANK_RE = /\A[\0\s]*\z/
@@ -57,6 +59,7 @@ module Gem
       }.freeze
 
       def initialize(source)
+        source = strip_bom(source)
         @lines = source.split(/\r?\n/).each(&:freeze)
         @anchors = {}
         @depth = 0
@@ -82,6 +85,14 @@ module Gem
       end
 
       private
+
+      # Compared byte-wise because metadata may be read as binary, which
+      # cannot be compared with a UTF-8 string containing the BOM character.
+      def strip_bom(source)
+        return source unless UTF8_BOM_BYTES.each_with_index.all? {|byte, i| source.getbyte(i) == byte }
+
+        source.byteslice(UTF8_BOM_BYTES.size..)
+      end
 
       def strip_document_prefix
         return if @lines.empty?
@@ -893,10 +904,14 @@ module Gem
 
     def load(str, permitted_classes: [], permitted_symbols: [], aliases: true)
       raise TypeError, "no implicit conversion of nil into String" if str.nil?
-      return nil if str.empty?
+      return {} if str.empty?
 
       ast = Parser.new(str).parse
-      return nil if ast.nil?
+      # Unlike Psych, a document with no content loads as an empty mapping:
+      # every caller (RubyGems config files, gem metadata, Bundler config)
+      # expects one, and already-released Bundler 4.0.x indexes the result of
+      # loading `.bundle/config` without checking for nil.
+      return {} if ast.nil?
 
       Builder.new(
         permitted_classes: permitted_classes,
