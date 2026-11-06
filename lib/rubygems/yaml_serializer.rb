@@ -31,6 +31,16 @@ module Gem
       # An entry of a flow sequence. A quoted entry may contain commas.
       FLOW_SEQUENCE_ENTRY_RE = /"(?:[^"\\]|\\.)*"|'(?:[^']|'')*'|[^,\s](?:[^,]*[^,\s])?/
       SEQUENCE_ENTRY_RE = /\G-(?: |\z)/
+      # A quoted scalar that is closed on the same line. One that does not
+      # match runs onto the following lines, up to its closing quote.
+      CLOSED_DOUBLE_QUOTED_RE = /\A"(?:[^"\\]|\\.)*"/
+      CLOSED_SINGLE_QUOTED_RE = /\A'(?>(?:[^']|'')*)'/
+      # The rest of a quoted scalar, up to its closing quote.
+      DOUBLE_QUOTED_END_RE = /\A((?:[^"\\]|\\.)*)"/
+      SINGLE_QUOTED_END_RE = /\A((?>(?:[^']|'')*))'/
+      # A double-quoted line ending in an unescaped "\", which escapes the line break.
+      ESCAPED_LINE_BREAK_RE = /(?<!\\)(?:\\\\)*\\\z/
+      DOUBLE_QUOTED_ESCAPE_RE = %r{\\(?:["\\/ 0abtnvfreN_LP]|x\h{2}|u\h{4}|U\h{8})}
       RUBY_OBJECT_TAG_RE = %r{\G!ruby/object:}
       LSTRIP_BYTES = [0, 9, 10, 11, 12, 13, 32].freeze
       MAX_NESTING_DEPTH = 1_000
@@ -41,6 +51,8 @@ module Gem
       STRING_UNESCAPES = {
         "\\\\" => "\\",
         "\\\"" => "\"",
+        "\\/" => "/",
+        "\\ " => " ",
         "\\0" => "\0",
         "\\a" => "\a",
         "\\b" => "\b",
@@ -118,8 +130,7 @@ module Gem
         elsif QUOTED_KEY_RE.match?(line, pos)
           # A mapping whose key is quoted, e.g. '"have: colon": value'.
           parse_mapping(indent, anchor)
-        elsif (/\G"/.match?(line, pos) && line.end_with?("\"")) ||
-              (/\G'/.match?(line, pos) && line.end_with?("'"))
+        elsif /\G["']/.match?(line, pos)
           # A whole-line quoted scalar, e.g. '"system: foo: bar"'. It may
           # contain ": ", so it must be checked before MAPPING_KEY_RE.
           parse_plain_scalar(indent, anchor)
@@ -285,15 +296,14 @@ module Gem
       end
 
       def parse_plain_scalar(indent, anchor)
-        val = @lines.shift.strip
-        result = coerce(val)
-        return register_anchor(anchor, result) if result.is_a?(Mapping) || result.is_a?(Sequence)
-
-        fold_continuation_lines(result, val, indent)
-        register_anchor(anchor, Scalar.new(result))
+        register_anchor(anchor, parse_inline_scalar(@lines.shift.strip, indent))
       end
 
       def parse_inline_scalar(val, indent)
+        if val.start_with?("\"", "'", "! ") && (quoted = parse_multiline_quoted_scalar(val))
+          return Scalar.new(quoted)
+        end
+
         result = coerce(val)
         return result if result.is_a?(Mapping) || result.is_a?(Sequence)
 
@@ -311,22 +321,61 @@ module Gem
         end
       end
 
+      # A quoted scalar whose closing quote is on a later line, e.g. a long
+      # description that Psych wrapped while emitting it. The line breaks are
+      # folded: the whitespace around them is dropped and each break becomes
+      # a space, or a newline for every empty line. Escapes are decoded after
+      # folding, so a double-quoted line ending in "\" joins the next one
+      # without a space. Returns nil when the closing quote is never found,
+      # leaving the lines in place.
+      def parse_multiline_quoted_scalar(val)
+        val = val[2..] if val.start_with?("! ") # legacy non-specific tag
+        return nil unless val.start_with?("\"", "'")
+
+        double = val.start_with?("\"")
+        return nil if (double ? CLOSED_DOUBLE_QUOTED_RE : CLOSED_SINGLE_QUOTED_RE).match?(val)
+
+        end_re = double ? DOUBLE_QUOTED_END_RE : SINGLE_QUOTED_END_RE
+        result = val[1..]
+        escaped_break = double && ESCAPED_LINE_BREAK_RE.match?(result)
+        empty_lines = 0
+
+        @lines.each_with_index do |line, i|
+          line = line.strip
+          closing = end_re.match(line)
+          if closing
+            line = closing[1]
+          elsif line.empty?
+            empty_lines += 1
+            next
+          end
+
+          if escaped_break
+            result.chop!
+          elsif empty_lines.zero?
+            result << " "
+          end
+          result << "\n" * empty_lines << line
+          escaped_break = double && ESCAPED_LINE_BREAK_RE.match?(line)
+          empty_lines = 0
+          next unless closing
+
+          @lines.shift(i + 1)
+          return double ? unescape_double_quoted(result) : unescape_single_quoted(result)
+        end
+
+        nil
+      end
+
       def coerce(val, depth = 0)
         raise_max_nesting! if depth > MAX_NESTING_DEPTH
 
         val = val.sub(/^! /, "") if val.start_with?("! ")
 
         if val.size >= 2 && val.start_with?("\"") && val.end_with?("\"")
-          inner = val[1..-2]
-          return inner unless inner.include?("\\")
-          inner.gsub(/\\(?:["\\0abtnvfreN_LP]|x\h{2}|u\h{4}|U\h{8})/) do |m|
-            char = STRING_UNESCAPES[m] || unescape_code_point(m)
-            # Metadata is read as binary, where non-ASCII text stays as UTF-8 bytes.
-            Encoding.compatible?(inner, char) ? char : char.b
-          end
+          unescape_double_quoted(val[1..-2])
         elsif val.size >= 2 && val.start_with?("'") && val.end_with?("'")
-          inner = val[1..-2]
-          inner.include?("''") ? inner.gsub("''", "'") : inner
+          unescape_single_quoted(val[1..-2])
         elsif val == "true"
           true
         elsif val == "false"
@@ -356,6 +405,19 @@ module Gem
         else
           val
         end
+      end
+
+      def unescape_double_quoted(inner)
+        return inner unless inner.include?("\\")
+        inner.gsub(DOUBLE_QUOTED_ESCAPE_RE) do |m|
+          char = STRING_UNESCAPES[m] || unescape_code_point(m)
+          # Metadata is read as binary, where non-ASCII text stays as UTF-8 bytes.
+          Encoding.compatible?(inner, char) ? char : char.b
+        end
+      end
+
+      def unescape_single_quoted(inner)
+        inner.include?("''") ? inner.gsub("''", "'") : inner
       end
 
       def unescape_code_point(escape)

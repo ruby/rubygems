@@ -1066,6 +1066,209 @@ class TestGemSafeYAML < Gem::TestCase
     assert_equal "no escape \\n here", result["key"]
   end
 
+  # Psych is the reference for YAML semantics: Gem::YAMLSerializer must load
+  # the input to the same value, whichever parser Gem.use_psych? selects.
+  def assert_loads_like_psych(yaml)
+    require "psych"
+
+    expected = Psych.safe_load(yaml, permitted_classes: Gem::SafeYAML::PERMITTED_CLASSES,
+                                     permitted_symbols: Gem::SafeYAML::PERMITTED_SYMBOLS, aliases: true)
+    actual = Gem::YAMLSerializer.load(yaml, permitted_classes: Gem::SafeYAML::PERMITTED_CLASSES,
+                                            permitted_symbols: Gem::SafeYAML::PERMITTED_SYMBOLS, aliases: true)
+    assert_equal expected, actual
+    actual
+  end
+
+  def test_load_multiline_double_quoted_scalar
+    # Psych wraps long double-quoted strings, escaping a space that would
+    # otherwise be lost at the start of a continuation line.
+    yaml = <<~'YAML'
+      ---
+      description: "First line of a description that Psych wrapped\nwhile emitting
+        it.\n\n  Indented line\n \ Another indented line"
+      other: 1
+    YAML
+
+    result = assert_loads_like_psych(yaml)
+    assert_equal "First line of a description that Psych wrapped\nwhile emitting it.\n\n" \
+                 "  Indented line\n  Another indented line", result["description"]
+    assert_equal 1, result["other"]
+  end
+
+  def test_load_multiline_double_quoted_scalar_with_blank_lines
+    yaml = <<~YAML
+      ---
+      description: "First paragraph
+
+        Second paragraph
+
+
+        Third paragraph
+        "
+      other: 1
+    YAML
+
+    result = assert_loads_like_psych(yaml)
+    assert_equal "First paragraph\nSecond paragraph\n\nThird paragraph ", result["description"]
+    assert_equal 1, result["other"]
+  end
+
+  def test_load_multiline_double_quoted_scalar_with_escaped_line_break
+    yaml = <<~'YAML'
+      ---
+      path: "C:\\Program Files\\\
+        Ruby\\bin"
+      joined: "no space  \
+          between"
+      paragraph: "kept\
+
+        after a blank line"
+    YAML
+
+    expected = {
+      "path" => "C:\\Program Files\\Ruby\\bin",
+      "joined" => "no space  between",
+      "paragraph" => "kept\nafter a blank line",
+    }
+    assert_equal expected, assert_loads_like_psych(yaml)
+  end
+
+  def test_load_multiline_single_quoted_scalar
+    yaml = <<~'YAML'
+      ---
+      summary: 'Ruby''s YAML parser folds this line and
+        the next one, keeping # and \n literal
+
+        after a blank line'
+      other: 1
+    YAML
+
+    result = assert_loads_like_psych(yaml)
+    assert_equal "Ruby's YAML parser folds this line and the next one, keeping # and \\n literal\n" \
+                 "after a blank line", result["summary"]
+    assert_equal 1, result["other"]
+  end
+
+  def test_load_multiline_quoted_scalar_as_sequence_item
+    yaml = <<~'YAML'
+      ---
+      authors:
+      - "First author, with a \"quoted\"
+        part on the next line\n"
+      - 'Second author
+        continued'
+      - plain
+      - name: "nested
+          value"
+        other: 2
+    YAML
+
+    expected = {
+      "authors" => [
+        "First author, with a \"quoted\" part on the next line\n",
+        "Second author continued",
+        "plain",
+        { "name" => "nested value", "other" => 2 },
+      ],
+    }
+    assert_equal expected, assert_loads_like_psych(yaml)
+  end
+
+  def test_load_multiline_quoted_scalar_on_its_own_line
+    yaml = <<~YAML
+      ---
+      key:
+        "value: with a colon
+        wrapped"
+      other: 1
+    YAML
+
+    assert_equal({ "key" => "value: with a colon wrapped", "other" => 1 }, assert_loads_like_psych(yaml))
+  end
+
+  def test_load_multiline_quoted_scalar_with_non_specific_tag
+    # Legacy RubyGems emitted a "! " non-specific tag in front of quoted values.
+    yaml = <<~YAML
+      ---
+      description: ! '
+
+        The Polyglot library allows a Ruby module to register a loader
+
+        for the file type associated with a filename extension, and it
+
+        augments ''require'' to find and load matching files.'
+      other: 1
+    YAML
+
+    result = assert_loads_like_psych(yaml)
+    assert_equal "\nThe Polyglot library allows a Ruby module to register a loader\n" \
+                 "for the file type associated with a filename extension, and it\n" \
+                 "augments 'require' to find and load matching files.", result["description"]
+  end
+
+  def test_specification_from_yaml_with_multiline_quoted_post_install_message
+    message = "\n[DEVISE] Please review the [changelog] and [upgrade guide] for more info on Hotwire / Turbo integration.\n\n" \
+              "  [changelog] https://github.com/heartcombo/devise/blob/main/CHANGELOG.md\n" \
+              "  [upgrade guide] https://github.com/heartcombo/devise/wiki/How-To:-Upgrade-to-Devise-4.9.0-%5BHotwire-Turbo-integration%5D\n  "
+
+    # The post_install_message as the Psych that built devise-4.9.4 wrote it into metadata.gz.
+    yaml = <<~'YAML'
+      --- !ruby/object:Gem::Specification
+      name: devise
+      version: !ruby/object:Gem::Version
+        version: 4.9.4
+      platform: ruby
+      authors:
+      - Jose Valim
+      autorequire:
+      bindir: bin
+      cert_chain: []
+      date: 2024-04-17 00:00:00.000000000 Z
+      dependencies: []
+      description: Flexible authentication solution for Rails with Warden
+      email: contact@heartcombo.com
+      executables: []
+      extensions: []
+      extra_rdoc_files: []
+      files: []
+      homepage: https://github.com/heartcombo/devise
+      licenses:
+      - MIT
+      metadata: {}
+      post_install_message: "\n[DEVISE] Please review the [changelog] and [upgrade guide]
+        for more info on Hotwire / Turbo integration.\n\n  [changelog] https://github.com/heartcombo/devise/blob/main/CHANGELOG.md\n
+        \ [upgrade guide] https://github.com/heartcombo/devise/wiki/How-To:-Upgrade-to-Devise-4.9.0-%5BHotwire-Turbo-integration%5D\n
+        \ "
+      rdoc_options: []
+      require_paths:
+      - lib
+      required_ruby_version: !ruby/object:Gem::Requirement
+        requirements:
+        - - ">="
+          - !ruby/object:Gem::Version
+            version: '2.1'
+      required_rubygems_version: !ruby/object:Gem::Requirement
+        requirements:
+        - - ">="
+          - !ruby/object:Gem::Version
+            version: '0'
+      requirements: []
+      rubygems_version: 3.5.9
+      signing_key:
+      specification_version: 4
+      summary: Flexible authentication solution for Rails with Warden
+      test_files: []
+    YAML
+
+    spec = Gem::Specification.from_yaml(yaml)
+    assert_equal message, spec.post_install_message
+    assert_equal message, assert_loads_like_psych(yaml).post_install_message
+
+    # A spec dumped by the installed Psych loads back to the same message.
+    spec = Gem::Specification.from_yaml(Psych.dump(spec))
+    assert_equal message, spec.post_install_message
+  end
+
   def test_load_quoted_numeric_stays_string
     result = yaml_load("key: \"42\"")
     assert_equal "42", result["key"]
@@ -1264,9 +1467,8 @@ class TestGemSafeYAML < Gem::TestCase
       other: 1
     YAML
 
-    result = yaml_load(yaml)
-    # Gem::YAMLSerializer does not fold multi-line quoted scalars, so only check that no text is lost.
-    assert_include result["summary"], "#tag and the rest"
+    result = assert_loads_like_psych(yaml)
+    assert_equal "first part of a summary Psych folded #tag and the rest", result["summary"]
     assert_equal 1, result["other"]
   end
 
