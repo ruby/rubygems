@@ -99,6 +99,34 @@ class TestGemResolverAPISet < Gem::TestCase
     assert_equal expected, set.find_all(a_dep)
   end
 
+  def test_find_all_blank_lines
+    spec_fetcher
+
+    data = [
+      { name: "a",
+        number: "1",
+        suffix: "ruby",
+        dependencies: [] },
+      { name: "a",
+        number: "2",
+        suffix: "ruby",
+        dependencies: [] },
+    ]
+
+    @fetcher.data["#{@dep_uri}a"] = util_compact_index_response("---\n1  \n\n2  \n")
+
+    set = Gem::Resolver::APISet.new @dep_uri
+
+    a_dep = Gem::Resolver::DependencyRequest.new dep("a"), nil
+
+    expected = [
+      Gem::Resolver::APISpecification.new(set, data.first),
+      Gem::Resolver::APISpecification.new(set, data.last),
+    ]
+
+    assert_equal expected, set.find_all(a_dep)
+  end
+
   def test_find_all_cache
     spec_fetcher
 
