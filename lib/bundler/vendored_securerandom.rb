@@ -13,3 +13,12 @@ unless defined?(Gem::SecureRandom)
     Gem::SecureRandom = SecureRandom
   end
 end
+
+# Bundler used to ship its own copy as Bundler::SecureRandom. Keep that name as
+# a deprecated alias of the RubyGems copy for code written against it.
+module Bundler
+  unless const_defined?(:SecureRandom, false)
+    SecureRandom = Gem::SecureRandom
+    deprecate_constant :SecureRandom
+  end
+end
