@@ -66,6 +66,30 @@ that would suck --ehhh=oh geez it looks like i might have broken bundler somehow
         expect(loaded).to eq({})
       end
     end
+
+    context "when the config file only contains a YAML document start marker" do
+      before { bundled_app("config").write("---\n") }
+
+      it "loads an empty config" do
+        loaded = settings.send(:load_config, bundled_app("config"))
+        expect(loaded).to eq({})
+      end
+    end
+
+    context "when the serializer deserializes the config file as nil" do
+      let(:serializer) { double("serializer") }
+
+      before do
+        bundled_app("config").write("---\n")
+        allow(settings).to receive(:serializer_class).and_return(serializer)
+        allow(serializer).to receive(:load).with("---\n").and_return(nil)
+      end
+
+      it "loads an empty config" do
+        loaded = settings.send(:load_config, bundled_app("config"))
+        expect(loaded).to eq({})
+      end
+    end
   end
 
   describe "#global_config_file" do
