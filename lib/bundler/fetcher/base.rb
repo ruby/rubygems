@@ -7,6 +7,7 @@ module Bundler
       attr_reader :display_uri
       attr_reader :remote
       attr_reader :gem_remote_fetcher
+      attr_accessor :metadata_requirements
 
       def initialize(downloader, remote, display_uri, gem_remote_fetcher)
         raise "Abstract class" if self.class == Base

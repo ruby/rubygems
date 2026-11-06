@@ -179,6 +179,7 @@ module Bundler
     # return the specs in the bundler format as an index
     def specs(gem_names, source)
       index = Bundler::Index.new
+      fetchers.each {|fetcher| fetcher.metadata_requirements = source.metadata_requirements }
 
       fetch_specs(gem_names).each do |name, version, suffix, dependencies, metadata|
         spec = if dependencies
