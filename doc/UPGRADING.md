@@ -74,10 +74,11 @@ likely to need attention are:
 *   `Gem::BasicSpecification#datadir` was removed, and native extension build
     logs (`gem_make.out`) are no longer installed with the gem.
 *   Bundler no longer ships its own copies of the libraries RubyGems also
-    vendors. The `Bundler::URI`, `Bundler::PubGrub`, `Bundler::SecureRandom`,
-    `Bundler::CompactIndexClient` and `Bundler::YAMLSerializer` constants are
-    gone; use `Gem::URI`, `Gem::PubGrub`, `Gem::SecureRandom`,
-    `Gem::CompactIndexClient` and `Gem::YAMLSerializer` instead.
+    vendors. Code that referenced `Bundler::URI`, `Bundler::PubGrub`,
+    `Bundler::SecureRandom`, `Bundler::CompactIndexClient` or
+    `Bundler::YAMLSerializer` should use `Gem::URI`, `Gem::PubGrub`,
+    `Gem::SecureRandom`, `Gem::CompactIndexClient` and `Gem::YAMLSerializer`
+    instead.
     `Bundler::ConnectionPool` and `Bundler::Persistent` (the vendored
     `net-http-persistent`) were removed without a replacement, since Bundler
     now fetches through `Gem::Request`.
