@@ -1246,6 +1246,37 @@ class TestGemPackage < Gem::Package::TarTestCase
     assert_path_exist extracted
   end
 
+  def test_extract_tar_gz_unsupported_typeflag
+    package = Gem::Package.new @gem
+
+    pax_record = "12 size=512\n"
+    pax_header = Gem::Package::TarHeader.new(
+      name: "PaxHeader/readme",
+      mode: 0o644,
+      size: pax_record.bytesize,
+      prefix: "",
+      typeflag: "x"
+    ).to_s
+
+    evil_body = "raise 'smuggled'\n"
+    raw_tar = String.new(encoding: Encoding::BINARY)
+    raw_tar << pax_header << pax_record.b.ljust(512, "\0")
+    raw_tar << tar_file_header("readme", "", 0o644, 0, Time.now)
+    raw_tar << tar_file_header("evil.rb", "", 0o644, evil_body.bytesize, Time.now)
+    raw_tar << evil_body.b.ljust(512, "\0")
+    raw_tar << ("\0" * 1024).b
+
+    tgz_io = StringIO.new(Gem::Util.gzip(raw_tar))
+
+    e = assert_raise(Gem::Package::TarInvalidError) do
+      package.extract_tar_gz tgz_io, @destination
+    end
+
+    assert_equal 'tar header has unsupported typeflag "x"', e.message
+    assert_path_not_exist File.join(@destination, "readme")
+    assert_path_not_exist File.join(@destination, "evil.rb")
+  end
+
   if Gem.win_platform?
     def test_extract_tar_gz_case_insensitive
       package = Gem::Package.new @gem
