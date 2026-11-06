@@ -612,6 +612,52 @@ ruby "0"
     Bundler::Plugin.reset!
   end
 
+  def test_load_lockfile_with_bundler_lockfile_parser_without_lockfile_path
+    require "bundler"
+    require "bundler/lockfile_parser"
+
+    File.open "gem.deps.rb.lock", "w" do |io|
+      io.puts <<~LOCKFILE
+        GEM
+          remote: #{@gem_repo}
+          specs:
+            a (1)
+
+        PLATFORMS
+          #{Gem::Platform::RUBY}
+
+        DEPENDENCIES
+          a
+      LOCKFILE
+    end
+
+    # Bundler::LockfileParser#initialize only accepts `lockfile_path:` since
+    # Bundler 4.1, and RubyGems may be updated while an older Bundler is loaded
+    current_initialize = Bundler::LockfileParser.instance_method(:initialize)
+    silence_warnings do
+      Bundler::LockfileParser.define_method(:initialize) do |lockfile, strict: false|
+        current_initialize.bind_call(self, lockfile, strict: strict)
+      end
+    end
+
+    assert_raise ArgumentError do
+      Bundler::LockfileParser.new("", lockfile_path: "gem.deps.rb.lock")
+    end
+
+    rs = Gem::RequestSet.new
+    rs.load_lockfile "gem.deps.rb.lock"
+
+    assert_equal [dep("a")], rs.dependencies
+
+    lock_set = rs.sets.find {|set| Gem::Resolver::LockSet === set }
+    refute_nil lock_set, "LockSet should be created from GEM section"
+    assert_equal %w[a-1], lock_set.specs.map(&:full_name)
+  ensure
+    if current_initialize
+      silence_warnings { Bundler::LockfileParser.define_method(:initialize, current_initialize) }
+    end
+  end
+
   def test_load_lockfile_keeps_bundler_root_when_it_cannot_be_swapped
     require "bundler"
 
