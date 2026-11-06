@@ -19,3 +19,12 @@ unless defined?(Gem::URI)
     end
   end
 end
+
+# Bundler used to ship its own copy as Bundler::URI. Keep that name as a
+# deprecated alias of the RubyGems copy for code written against it.
+module Bundler
+  unless const_defined?(:URI, false)
+    URI = Gem::URI
+    deprecate_constant :URI
+  end
+end
