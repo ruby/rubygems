@@ -780,4 +780,68 @@ RSpec.describe "bundler/inline#gemfile" do
 
     expect(lockfile).to eq(original_lockfile)
   end
+
+  it "runs at_exit hooks only once, in the main process" do
+    script <<-RUBY
+      at_exit { puts "at_exit" }
+
+      gemfile do
+        source "https://gem.repo1"
+        gem "myrack"
+      end
+
+      puts "main"
+    RUBY
+
+    expect(out).to eq("main\nat_exit")
+    expect(err).to be_empty
+  end
+
+  it "raises an error that the script can rescue when installation fails" do
+    script <<-RUBY
+      begin
+        gemfile do
+          source "https://gem.repo1"
+          gem "doesnotexist"
+        end
+      rescue Bundler::BundlerError => e
+        puts "rescued \#{e.class}: \#{e.message}"
+      end
+
+      puts "main"
+    RUBY
+
+    expect(out).to include("rescued Bundler::GemNotFound: Could not find gem 'doesnotexist'")
+    expect(out).to end_with("main")
+    expect(err).to be_empty
+  end
+
+  it "prints a Bundler error and exits with a non-zero status when installation fails and the error is not rescued" do
+    script <<-RUBY, raise_on_error: false
+      gemfile do
+        source "https://gem.repo1"
+        gem "doesnotexist"
+      end
+
+      puts "main"
+    RUBY
+
+    expect(exitstatus).to be > 0
+    expect(err).to include("Could not find gem 'doesnotexist'")
+    expect(err).to include("Bundler::GemNotFound")
+    expect(out).not_to include("main")
+  end
+
+  it "does not duplicate installation output when installing in a subprocess" do
+    script <<-RUBY
+      gemfile(true) do
+        source "https://gem.repo1"
+        gem "myrack"
+      end
+    RUBY
+
+    expect(out.scan("Resolving dependencies...").size).to eq(1)
+    expect(out.scan("Fetching gem metadata").size).to eq(1)
+    expect(err).to be_empty
+  end
 end

@@ -77,10 +77,44 @@ def gemfile(force_latest_compatible = false, options = {}, &gemfile)
         installed_in_fork = false
         if Process.respond_to?(:fork)
           Gem.load_yaml # Avoid NameError on Ruby 3.2's safe_yaml.rb after Gem::Specification.reset
-          _, status = Process.waitpid2(Process.fork do
-                                         $VERBOSE = nil
-                                         do_install.call end)
-          exit(status.exitstatus || status.to_i) unless status.success?
+          reader, writer = IO.pipe
+          pid = Process.fork do
+            reader.close
+            $VERBOSE = nil
+            exit_status = 0
+            begin
+              do_install.call
+            rescue Exception => e # rubocop:disable Lint/RescueException
+              # Relay the error to the parent process, which re-raises it so
+              # that the script can rescue it as if the install had happened
+              # in-process.
+              exit_status = 1
+              begin
+                writer.write(Marshal.dump(e))
+              rescue TypeError
+                writer.write(Marshal.dump(Bundler::InstallError.new(e.message)))
+              end
+            ensure
+              writer.close
+              $stdout.flush
+              $stderr.flush
+              # Make sure the parent's `at_exit` handlers don't run in the child
+              exit!(exit_status)
+            end
+          end
+          writer.close
+          error = reader.read
+          reader.close
+          _, status = Process.waitpid2(pid)
+
+          unless status.success?
+            raise Bundler::BundlerError, "Installing gems in a subprocess failed (#{status})" if error.empty?
+
+            error = Marshal.load(error)
+            raise error if error.is_a?(Bundler::BundlerError)
+
+            raise Bundler::InstallError, error.message, error.backtrace
+          end
 
           installed_in_fork = true
 
@@ -110,7 +144,10 @@ def gemfile(force_latest_compatible = false, options = {}, &gemfile)
       configure_forked_definition.call(definition) if installed_in_fork
 
       begin
-        runtime = Bundler::Runtime.new(nil, definition).setup
+        runtime = Bundler::Runtime.new(nil, definition)
+        # The subprocess already printed resolution output while installing,
+        # so don't print it again when re-resolving in this process.
+        runtime = installed_in_fork ? Bundler.ui.silence { runtime.setup } : runtime.setup
       rescue Gem::LoadError => e
         name = e.name
         version = e.requirement.requirements.first[1]
