@@ -427,16 +427,20 @@ class TestGemSafeYAML < Gem::TestCase
     assert_equal [], spec.rdoc_options
   end
 
-  def test_load_returns_nil_for_comment_only_yaml
-    # Bundler config files may contain only comments after deleting all keys
-    result = yaml_load("---\n# BUNDLE_FOO: \"bar\"\n")
-    assert_nil result
+  def test_load_returns_hash_for_comment_only_yaml
+    # Bundler config files may contain only comments after deleting all keys.
+    # Psych returns nil here, but the serializer's callers expect a mapping.
+    result = Gem::YAMLSerializer.load("---\n# BUNDLE_FOO: \"bar\"\n")
+    assert_equal({}, result)
   end
 
-  def test_load_returns_nil_for_empty_document
-    assert_nil yaml_load("---\n")
-    assert_nil yaml_load("")
-    assert_raise(TypeError) { yaml_load(nil) }
+  def test_load_returns_hash_for_empty_document
+    # `bundle config unset` leaves a file containing only "---\n" behind.
+    assert_equal({}, Gem::YAMLSerializer.load("---\n"))
+    assert_equal({}, Gem::YAMLSerializer.load("--- \n"))
+    assert_equal({}, Gem::YAMLSerializer.load("\n  \n"))
+    assert_equal({}, Gem::YAMLSerializer.load(""))
+    assert_raise(TypeError) { Gem::YAMLSerializer.load(nil) }
   end
 
   def test_load_returns_hash_for_flow_empty_hash

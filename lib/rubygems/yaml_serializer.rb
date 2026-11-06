@@ -893,10 +893,14 @@ module Gem
 
     def load(str, permitted_classes: [], permitted_symbols: [], aliases: true)
       raise TypeError, "no implicit conversion of nil into String" if str.nil?
-      return nil if str.empty?
+      return {} if str.empty?
 
       ast = Parser.new(str).parse
-      return nil if ast.nil?
+      # Unlike Psych, a document with no content loads as an empty mapping:
+      # every caller (RubyGems config files, gem metadata, Bundler config)
+      # expects one, and already-released Bundler 4.0.x indexes the result of
+      # loading `.bundle/config` without checking for nil.
+      return {} if ast.nil?
 
       Builder.new(
         permitted_classes: permitted_classes,
