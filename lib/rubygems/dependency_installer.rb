@@ -212,7 +212,10 @@ class Gem::DependencyInstaller
     request_set.cooldown = @cooldown
 
     installer_set = Gem::Resolver::InstallerSet.new @domain
-    installer_set.ignore_installed = (@minimal_deps == false) || @only_install_dir
+    # With a build root, Gem::Installer looks for dependencies under it, so the
+    # gems already in the install dir can't be used
+    installer_set.ignore_installed = (@minimal_deps == false) || (@only_install_dir && !@build_root.nil?)
+    installer_set.install_dir = @install_dir if @only_install_dir
     installer_set.force = @force
 
     if consider_local?
