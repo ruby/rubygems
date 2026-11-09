@@ -145,7 +145,7 @@ class Changelog
 
   def labelled?(pull)
     labels = pull.labels.map(&:name)
-    return false if old_stable? && beyond_old_stable?(labels)
+    return false if old_stable? && (labels.include?(@config["skip_old_stable_label"]) || beyond_old_stable?(labels))
 
     changelog_labels.intersect?(labels)
   end

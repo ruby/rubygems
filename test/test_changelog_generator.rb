@@ -110,6 +110,15 @@ class ChangelogTest < Test::Unit::TestCase
     end
   end
 
+  def test_skip_old_stable_leaves_a_pull_request_out_of_the_old_stable_line_only
+    with_old_stable_branch("9.8") do
+      skipped = pull(1, "bundler: bug fix", "skip old stable")
+
+      refute Changelog.for_release("9.8.1").labelled?(skipped)
+      assert Changelog.for_release("9.9.1").labelled?(skipped)
+    end
+  end
+
   def test_unreleased_notes_split_the_sections_by_library
     pulls = [
       pull(1, "rubygems: bug fix"),
