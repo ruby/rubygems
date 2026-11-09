@@ -144,7 +144,10 @@ class Changelog
   end
 
   def labelled?(pull)
-    changelog_labels.intersect?(pull.labels.map(&:name))
+    labels = pull.labels.map(&:name)
+    return false if old_stable? && beyond_old_stable?(labels)
+
+    changelog_labels.intersect?(labels)
   end
 
   # A pull request labelled for both libraries is listed under both, the way
@@ -169,7 +172,7 @@ class Changelog
 
   attr_reader :version
 
-  # Three tables in `.changelog.yml` have to agree on the same label names.
+  # The label tables in `.changelog.yml` have to agree on the same label names.
   # Where they do not, the release carries the pull request and then drops its
   # entry, or quietly stops backporting it, without saying anything. Check the
   # raw tables rather than the reader, which the per-library layout filters.
@@ -179,8 +182,12 @@ class Changelog
     missing = mapping.keys.map {|label| label.split(": ").first }.uniq - library_headings.keys
     raise "No library_headings entry in .changelog.yml for #{missing.join(", ")}" unless missing.empty?
 
-    unknown = patch_level_labels - mapping.keys
+    unknown = (patch_level_labels | old_stable_labels) - mapping.keys
     raise "No changelog_label_mapping entry in .changelog.yml for #{unknown.join(", ")}" unless unknown.empty?
+
+    # YAML reads an unquoted 4.1 as a number, which no release line equals.
+    branch = @config["old_stable_branch"]
+    raise "old_stable_branch in .changelog.yml has to be a quoted string such as \"4.0\", not #{branch.inspect}" unless branch.nil? || branch.is_a?(String)
   end
 
   def format_header
@@ -311,7 +318,9 @@ class Changelog
   end
 
   def relevant_changelog_label_mapping
-    if @level == :patch
+    if old_stable?
+      changelog_label_mapping.slice(*old_stable_labels)
+    elsif @level == :patch
       changelog_label_mapping.slice(*patch_level_labels)
     else
       changelog_label_mapping
@@ -478,5 +487,24 @@ class Changelog
 
   def patch_level_labels
     @config["patch_level_labels"]
+  end
+
+  # Nothing in the version tells the old stable line from the stable one, so
+  # `.changelog.yml` names it.
+  def old_stable?
+    branch = @config["old_stable_branch"]
+    return false unless @level == :patch && branch
+
+    Gem::Version.new(version.segments[0, 2].join(".")) <= Gem::Version.new(branch)
+  end
+
+  def old_stable_labels
+    @config["old_stable_labels"]
+  end
+
+  # A pull request is cherry-picked whole, so one that also carries a label the
+  # old stable line does not take, even for the other library, stays out of it.
+  def beyond_old_stable?(labels)
+    labels.any? {|label| @config["changelog_label_mapping"][label] && !old_stable_labels.include?(label) }
   end
 end

@@ -60,6 +60,56 @@ class ChangelogTest < Test::Unit::TestCase
     end
   end
 
+  def test_an_old_stable_label_with_no_mapping_is_rejected
+    config = Psych.load_file(File.expand_path("../.changelog.yml", __dir__))
+    config["old_stable_labels"] << "rubygems: typo"
+
+    Psych.stub(:load_file, config) do
+      error = assert_raise(RuntimeError) { Changelog.for_release("9.9.0") }
+      assert_include error.message, "No changelog_label_mapping entry in .changelog.yml for rubygems: typo"
+    end
+  end
+
+  def test_an_unquoted_old_stable_branch_is_rejected
+    with_old_stable_branch(4.1) do
+      error = assert_raise(RuntimeError) { Changelog.for_release("9.9.0") }
+      assert_include error.message, "old_stable_branch in .changelog.yml has to be a quoted string"
+    end
+  end
+
+  def test_a_patch_release_of_the_old_stable_line_takes_only_the_old_stable_labels
+    with_old_stable_branch("9.8") do
+      old_stable = Changelog.for_release("9.8.1")
+
+      assert old_stable.labelled?(pull(1, "rubygems: bug fix"))
+      assert old_stable.labelled?(pull(2, "bundler: security"))
+      assert old_stable.labelled?(pull(3, "rubygems: documentation"))
+      refute old_stable.labelled?(pull(4, "bundler: enhancement"))
+      refute old_stable.labelled?(pull(5, "rubygems: skip changelog"))
+
+      assert Changelog.for_release("9.9.1").labelled?(pull(4, "bundler: enhancement"))
+    end
+  end
+
+  def test_a_pull_request_also_labelled_for_another_section_stays_out_of_the_old_stable_line
+    with_old_stable_branch("9.8") do
+      old_stable = Changelog.for_release("9.8.1")
+
+      refute old_stable.labelled?(pull(1, "bundler: bug fix", "rubygems: enhancement"))
+      assert old_stable.labelled?(pull(2, "bundler: bug fix", "rubygems: skip changelog"))
+      assert old_stable.labelled?(pull(3, "bundler: bug fix", "rubygems: documentation"))
+    end
+  end
+
+  def test_a_line_older_than_the_old_stable_one_takes_no_more_than_it
+    with_old_stable_branch("9.8") do
+      older = Changelog.for_release("9.7.1")
+
+      assert older.labelled?(pull(1, "rubygems: bug fix"))
+      refute older.labelled?(pull(2, "bundler: enhancement"))
+    end
+  end
+
   def test_unreleased_notes_split_the_sections_by_library
     pulls = [
       pull(1, "rubygems: bug fix"),
@@ -524,6 +574,13 @@ class ChangelogTest < Test::Unit::TestCase
       [User.new("Someone", "someone")],
       "https://github.com/ruby/rubygems/pull/#{number}"
     )
+  end
+
+  def with_old_stable_branch(branch, &block)
+    config = Psych.load_file(File.expand_path("../.changelog.yml", __dir__))
+    config["old_stable_branch"] = branch
+
+    Psych.stub(:load_file, config, &block)
   end
 
   def library_notes(notes, heading)
