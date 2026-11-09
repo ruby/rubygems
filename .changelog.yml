@@ -79,4 +79,4 @@ old_stable_labels:
   - "rubygems: documentation"
   - "bundler: documentation"
 
-skip_old_stable_label: "skip old stable"
+skip_old_stable_label: skip old stable
