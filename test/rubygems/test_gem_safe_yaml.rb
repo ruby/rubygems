@@ -1537,8 +1537,9 @@ class TestGemSafeYAML < Gem::TestCase
 
     assert_equal "---\ntext: |+\n  line1\n  line2\n\nother: value\n...\n", Gem::YAMLSerializer.dump(hash)
     assert_equal "---\n- |2+\n    indented\n  three trailing newlines\n\n\n...\n", Gem::YAMLSerializer.dump(array)
-    assert_equal Psych.dump(hash), Gem::YAMLSerializer.dump(hash)
-    assert_equal Psych.dump(array), Gem::YAMLSerializer.dump(array)
+    # JRuby's Psych.dump leaves out the trailing `...`, so compare what Psych reads back.
+    assert_equal hash, Psych.load(Gem::YAMLSerializer.dump(hash))
+    assert_equal array, Psych.load(Gem::YAMLSerializer.dump(array))
   end
 
   def test_dump_nil_value
