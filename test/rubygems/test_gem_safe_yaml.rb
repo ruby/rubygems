@@ -427,16 +427,38 @@ class TestGemSafeYAML < Gem::TestCase
     assert_equal [], spec.rdoc_options
   end
 
-  def test_load_returns_nil_for_comment_only_yaml
-    # Bundler config files may contain only comments after deleting all keys
-    result = yaml_load("---\n# BUNDLE_FOO: \"bar\"\n")
-    assert_nil result
+  def test_yaml_serializer_load_returns_empty_hash_for_empty_document
+    assert_equal({}, Gem::YAMLSerializer.load(""))
+    assert_equal({}, Gem::YAMLSerializer.load("---\n"))
+    assert_equal({}, Gem::YAMLSerializer.load("---\n# BUNDLE_FOO: \"bar\"\n"))
+    assert_equal({}, Gem::YAMLSerializer.load("---\n...\n"))
+    assert_equal({}, Gem::YAMLSerializer.load("--- ~\n"))
+    assert_raise(TypeError) { Gem::YAMLSerializer.load(nil) }
   end
 
-  def test_load_returns_nil_for_empty_document
-    assert_nil yaml_load("---\n")
-    assert_nil yaml_load("")
-    assert_raise(TypeError) { yaml_load(nil) }
+  def test_safe_load_returns_nil_for_empty_document
+    assert_nil Gem::SafeYAML.safe_load("")
+    assert_nil Gem::SafeYAML.safe_load("---\n")
+    assert_nil Gem::SafeYAML.safe_load("---\n# BUNDLE_FOO: \"bar\"\n")
+    assert_nil Gem::SafeYAML.safe_load("---\n...\n")
+    assert_nil Gem::SafeYAML.safe_load("--- ~\n")
+    assert_raise(TypeError) { Gem::SafeYAML.safe_load(nil) }
+  end
+
+  def test_load_stops_at_document_end_marker
+    assert_equal({ "a" => 1 }, yaml_load("a: 1\n...\nb: 2\n"))
+    assert_equal({ "a" => 1 }, yaml_load("a: 1\n... # end\nb: 2\n"))
+    assert_equal({ "a" => 1 }, yaml_load("a: 1\n...\t\nb: 2\n"))
+    assert_equal({ "a" => 1 }, yaml_load("a: 1\r\n...\r\nb: 2\r\n"))
+    assert_equal({ "a" => 1 }, Gem::SafeYAML.safe_load("a: 1\n...\nb: 2\n"))
+    assert_equal({ "a" => "..." }, yaml_load("a: ...\n"))
+  end
+
+  def test_load_ignores_leading_utf8_bom
+    assert_equal({ "BUNDLE_PATH" => "vendor" }, yaml_load("\uFEFFBUNDLE_PATH: vendor\n"))
+    assert_equal({ "BUNDLE_PATH" => "vendor" }, Gem::YAMLSerializer.load("\uFEFF---\nBUNDLE_PATH: vendor\n"))
+    assert_equal({ "BUNDLE_PATH" => "vendor" }, Gem::YAMLSerializer.load("\uFEFFBUNDLE_PATH: vendor\n".b))
+    assert_equal({}, Gem::YAMLSerializer.load("\uFEFF"))
   end
 
   def test_load_returns_hash_for_flow_empty_hash
@@ -1260,6 +1282,18 @@ class TestGemSafeYAML < Gem::TestCase
     result = yaml_load("key:")
     assert_kind_of Hash, result
     assert_nil result["key"]
+  end
+
+  def test_load_tab_after_mapping_colon
+    # Psych treats tabs after the ":" as separation whitespace, like spaces.
+    assert_equal({ "BUNDLE_PATH" => "vendor" }, yaml_load("BUNDLE_PATH:\tvendor\n"))
+    assert_equal({ "BUNDLE_PATH" => "vendor" }, yaml_load("BUNDLE_PATH: \tvendor\n"))
+    assert_equal({ "BUNDLE_PATH" => "vendor" }, yaml_load("BUNDLE_PATH:\t\tvendor\n"))
+    assert_equal({ "key" => "quoted" }, yaml_load("key:\t\"quoted\"\n"))
+    assert_equal({ "key" => "a\tb" }, yaml_load("key:\ta\tb\n"))
+    assert_equal({ "key" => { "nested" => 1 } }, yaml_load("key:\t\n  nested: 1\n"))
+    assert_equal([{ "key" => "v" }], yaml_load("- key:\tv\n"))
+    assert_equal({ "q" => "v" }, yaml_load("\"q\":\tv\n"))
   end
 
   def test_load_sequence_item_as_mapping
