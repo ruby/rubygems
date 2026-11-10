@@ -31,6 +31,10 @@ module Gem
       # An entry of a flow sequence. A quoted entry may contain commas.
       FLOW_SEQUENCE_ENTRY_RE = /"(?:[^"\\]|\\.)*"|'(?:[^']|'')*'|[^,\s](?:[^,]*[^,\s])?/
       SEQUENCE_ENTRY_RE = /\G-(?: |\z)/
+      # A folded block scalar header: ">" with optional indentation and
+      # chomping indicators and an optional trailing comment. Anything else
+      # starting with ">" (e.g. ">= 1") stays a plain scalar.
+      FOLDED_SCALAR_HEADER_RE = /\A>(?:[1-9][+-]?|[+-][1-9]?)?(?:\s+#.*)?\z/
       RUBY_OBJECT_TAG_RE = %r{\G!ruby/object:}
       LSTRIP_BYTES = [0, 9, 10, 11, 12, 13, 32].freeze
       MAX_NESTING_DEPTH = 1_000
@@ -127,10 +131,10 @@ module Gem
           parse_mapping(indent, anchor)
         elsif RUBY_OBJECT_TAG_RE.match?(line, pos)
           parse_tagged_node(indent, anchor)
-        elsif /\G\|/.match?(line, pos)
-          modifier = line[pos + 1, line.size].strip
+        elsif /\G\|/.match?(line, pos) || FOLDED_SCALAR_HEADER_RE.match?(line[pos, line.size].strip)
+          header = line[pos, line.size].strip
           @lines.shift
-          register_anchor(anchor, Scalar.new(parse_block_scalar(indent, modifier)))
+          register_anchor(anchor, Scalar.new(parse_block_scalar(indent, header)))
         else
           parse_plain_scalar(indent, anchor)
         end
@@ -173,8 +177,8 @@ module Gem
               (MAPPING_KEY_RE.match?(content) && !content.start_with?("!ruby/object:"))
           @lines.unshift("#{" " * (indent + 2)}#{content}")
           parse_node(indent)
-        elsif content.start_with?("|")
-          Scalar.new(parse_block_scalar(indent, content[1..].to_s.strip))
+        elsif content.start_with?("|") || FOLDED_SCALAR_HEADER_RE.match?(content)
+          Scalar.new(parse_block_scalar(indent, content))
         else
           parse_inline_scalar(content, indent)
         end
@@ -231,8 +235,8 @@ module Gem
           Sequence.new([])
         elsif val == "{}"
           Mapping.new([])
-        elsif val.start_with?("|")
-          Scalar.new(parse_block_scalar(indent, val[1..].to_s.strip))
+        elsif val.start_with?("|") || FOLDED_SCALAR_HEADER_RE.match?(val)
+          Scalar.new(parse_block_scalar(indent, val))
         else
           parse_inline_scalar(val, indent)
         end
@@ -259,8 +263,11 @@ module Gem
         end
       end
 
-      def parse_block_scalar(base_indent, modifier)
-        parts = []
+      # Parses a literal ("|") or folded (">") block scalar. +header+ is the
+      # indicator followed by the optional chomping and indentation indicators.
+      def parse_block_scalar(base_indent, header)
+        lines = []
+        modifier = header[1..].to_s.strip
         indentation = modifier[/\A[+-]?([1-9])/, 1]
         chomping = modifier[/\A[1-9]?([+-])/, 1]
         block_indent = indentation && base_indent + indentation.to_i
@@ -268,19 +275,51 @@ module Gem
         while @lines.any?
           line = @lines[0]
           if BLANK_RE.match?(line)
-            parts << line[block_indent..] if block_indent && line.size > block_indent
-            parts << "\n"
+            lines << (block_indent && line.size > block_indent ? line[block_indent..] : "")
             @lines.shift
           else
             line_indent = indent_of(line)
             break if line_indent <= base_indent
             block_indent ||= line_indent
-            parts << @lines.shift[block_indent..].to_s << "\n"
+            lines << @lines.shift[block_indent..].to_s
           end
         end
 
-        res = parts.join
+        res = header.start_with?(">") ? fold_block_lines(lines) : lines.map {|l| "#{l}\n" }.join
         res.delete_suffix!("\n") while chomping == "-" && res.end_with?("\n")
+        res
+      end
+
+      # Joins the lines of a folded block scalar: a line break between two
+      # lines at the block indentation becomes a space, each empty line
+      # becomes a newline, and "more-indented" lines (starting with
+      # whitespace) keep their line breaks.
+      def fold_block_lines(lines)
+        res = +""
+        prev_more_indented = nil
+        empty = 0
+        lines.each do |line|
+          if line.empty?
+            empty += 1
+            next
+          end
+
+          more_indented = line.start_with?(" ", "\t")
+          if prev_more_indented.nil?
+            res << "\n" * empty
+          elsif prev_more_indented || more_indented
+            res << "\n" * (empty + 1)
+          elsif empty.zero?
+            res << " "
+          else
+            res << "\n" * empty
+          end
+          res << line
+          prev_more_indented = more_indented
+          empty = 0
+        end
+        res << "\n" * empty
+        res << "\n" unless prev_more_indented.nil?
         res
       end
 
@@ -373,7 +412,7 @@ module Gem
       def parse_binary_value(val, indent)
         rest = val.sub(/\A!binary\s+/, "")
         if rest.start_with?("|")
-          content = parse_block_scalar(indent, rest[1..].to_s.strip)
+          content = parse_block_scalar(indent, rest)
           Scalar.new(content.unpack1("m"))
         else
           Scalar.new(decode_binary_tag(val))
