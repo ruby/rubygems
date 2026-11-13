@@ -544,9 +544,12 @@ if you believe they were disclosed to a third party.
   end
 
   def load_file(filename)
-    yaml_errors = [ArgumentError]
-
     return {} unless filename && !filename.empty? && File.exist?(filename)
+
+    # The serializer raises Psych's exception classes (or stand-ins for them
+    # when Psych is not loaded) for bad aliases, disallowed tags and the like.
+    require_relative "yaml_serializer"
+    yaml_errors = [ArgumentError, Psych::Exception]
 
     begin
       config = self.class.load_with_rubygems_config_hash(File.read(filename))
