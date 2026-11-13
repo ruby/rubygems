@@ -83,7 +83,7 @@ class Gem::Package::TarHeader
                   "A12"  + # size
                   "A12"  + # mtime
                   "A8"   + # checksum
-                  "A"    + # typeflag
+                  "Z"    + # typeflag
                   "A100" + # linkname
                   "A6"   + # magic
                   "A2"   + # version
@@ -164,7 +164,7 @@ class Gem::Package::TarHeader
     @prefix = vals[:prefix]
     @size = vals[:size]
     @typeflag = vals[:typeflag]
-    @typeflag = "0" if @typeflag.nil? || @typeflag.empty?
+    @typeflag = "0" if @typeflag.nil? || @typeflag.empty? || @typeflag == "\0"
     @uid = vals[:uid] || 0
     @uname = vals[:uname] || "wheel"
     @version = vals[:version] || "00"

@@ -147,4 +147,39 @@ class TestGemPackageTarReader < Gem::Package::TarTestCase
 
     assert_equal 1, count, "should have found one file"
   end
+
+  def test_each_typeflag_nul
+    raw = tar_file_header("foo", "", 0o644, 2, Time.now).dup
+    raw.setbyte(156, 0)
+    raw << "hi".ljust(512, "\0")
+
+    entries = []
+    Gem::Package::TarReader.new(StringIO.new(raw)) do |tar_reader|
+      tar_reader.each do |entry|
+        entries << [entry.full_name, entry.file?, entry.read]
+      end
+    end
+
+    assert_equal [["foo", true, "hi"]], entries
+  end
+
+  def test_each_unsupported_typeflag
+    ["1", "x", "g", "L", "K", " ", "Z"].each do |typeflag|
+      tar = Gem::Package::TarHeader.new(
+        name: "foo",
+        mode: 0o644,
+        size: 0,
+        prefix: "",
+        typeflag: typeflag
+      ).to_s
+
+      e = assert_raise(Gem::Package::TarInvalidError) do
+        Gem::Package::TarReader.new(StringIO.new(tar)) do |tar_reader|
+          tar_reader.each { flunk "unexpected entry yielded for typeflag #{typeflag.inspect}" }
+        end
+      end
+
+      assert_equal "tar header has unsupported typeflag #{typeflag.inspect}", e.message
+    end
+  end
 end
