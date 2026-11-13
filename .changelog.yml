@@ -62,3 +62,21 @@ patch_level_labels:
   - "bundler: documentation"
   - "rubygems: skip changelog"
   - "bundler: skip changelog"
+
+# The line before the stable one. Its patch releases, and those of any older
+# line, take only the labels below, and leave out a pull request labelled with
+# skip_old_stable_label, which still goes into the stable line. Move it to the
+# outgoing stable line when a minor version is released. It is not the
+# previous stable branch that tool/release.rb derives, which is the line a
+# minor release follows.
+old_stable_branch: "4.0"
+
+old_stable_labels:
+  - "rubygems: bug fix"
+  - "bundler: bug fix"
+  - "rubygems: security"
+  - "bundler: security"
+  - "rubygems: documentation"
+  - "bundler: documentation"
+
+skip_old_stable_label: skip old stable

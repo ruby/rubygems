@@ -519,7 +519,12 @@ class Release
 
     reachable = Set.new(commits.split("\n"))
 
-    merged_pull_requests(base, from).select {|pull| reachable.include?(pull.merge_commit_sha) }
+    # A final minor release is tagged on its stable branch, which `to` does not
+    # contain, so the range starts back where the two diverged.
+    fork_point = git_quietly("merge-base", from, to).strip
+    raise "Failed to find where #{from} and #{to} diverged" unless Process.last_status.success?
+
+    merged_pull_requests(base, fork_point).select {|pull| reachable.include?(pull.merge_commit_sha) }
   end
 
   # The date bound is deliberately loose. It bounds the query, not the result.
