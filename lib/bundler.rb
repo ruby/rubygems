@@ -53,6 +53,7 @@ module Bundler
   autoload :FREEBSD,                File.expand_path("bundler/constants", __dir__)
   autoload :GemHelper,              File.expand_path("bundler/gem_helper", __dir__)
   autoload :GemVersionPromoter,     File.expand_path("bundler/gem_version_promoter", __dir__)
+  autoload :GemfileRequirementRewriter, File.expand_path("bundler/gemfile_requirement_rewriter", __dir__)
   autoload :Index,                  File.expand_path("bundler/index", __dir__)
   autoload :Injector,               File.expand_path("bundler/injector", __dir__)
   autoload :Installer,              File.expand_path("bundler/installer", __dir__)
