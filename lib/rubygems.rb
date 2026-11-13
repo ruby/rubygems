@@ -1325,7 +1325,7 @@ An Array (#{env.inspect}) was passed in from #{caller[3]}
     #   registering the spec's filenames. Unprefixed files are omitted.
     #
 
-    def register_default_spec(spec)
+    def register_default_spec(spec, loaded_features = loaded_default_gem_features)
       extended_require_paths = spec.require_paths.map {|f| f + "/" }
       new_format = extended_require_paths.any? {|path| spec.files.any? {|f| f.start_with? path } }
 
@@ -1352,10 +1352,23 @@ An Array (#{env.inspect}) was passed in from #{caller[3]}
         # activate the default Bundler.
         next if file.start_with?("rubygems/")
 
-        spec.activate if already_loaded?(file)
+        spec.activate if loaded_features.include?(file)
 
         @path_to_default_spec_map[file] = spec
         @path_to_default_spec_map[file.sub(suffix_regexp, "")] = spec
+      end
+    end
+
+    ##
+    # The loaded features under a default gem load path, relative to it, the
+    # way default gem specs list their files.
+
+    def loaded_default_gem_features # :nodoc:
+      prefixes = default_gem_load_paths.map {|load_path_entry| "#{load_path_entry}/" }
+      $LOADED_FEATURES.each_with_object({}) do |feature_path, features|
+        prefixes.each do |prefix|
+          features[feature_path.delete_prefix(prefix)] = true if feature_path.start_with?(prefix)
+        end
       end
     end
 
@@ -1427,12 +1440,6 @@ An Array (#{env.inspect}) was passed in from #{caller[3]}
     attr_reader :pre_uninstall_hooks
 
     private
-
-    def already_loaded?(file)
-      $LOADED_FEATURES.any? do |feature_path|
-        feature_path.end_with?(file) && default_gem_load_paths.any? {|load_path_entry| feature_path == "#{load_path_entry}/#{file}" }
-      end
-    end
 
     def default_gem_load_paths
       @default_gem_load_paths ||= $LOAD_PATH[load_path_insert_index..-1].map do |lp|
