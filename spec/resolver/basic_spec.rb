@@ -17,6 +17,94 @@ RSpec.describe "Resolving" do
     should_resolve_as %w[actionpack-2.3.5 activesupport-2.3.5 myrack-1.0]
   end
 
+  context "when preparing candidates for a direct requirement" do
+    let(:source) { instance_double(Bundler::Source::Rubygems, specs: @index, to_s: "fixture source") }
+    let(:dependencies) { [Bundler::Dependency.new("foo", "= 1.0")] }
+    let(:base_specs) { Bundler::SpecSet.new([]) }
+    let(:originally_locked) { Bundler::SpecSet.new([]) }
+    let(:overrides) { [] }
+    let(:base) do
+      Bundler::Resolver::Base.new({ default: source }, dependencies, base_specs, ["ruby"],
+        locked_specs: originally_locked, unlock: true, overrides: overrides)
+    end
+    let(:package) { base.get_package("foo") }
+    let(:resolver) { Bundler::Resolver.new(base, Bundler::GemVersionPromoter.new) }
+    let(:foo_one) { @index.search("foo").find {|spec| spec.version.to_s == "1.0" } }
+    let(:foo_two) { @index.search("foo").find {|spec| spec.version.to_s == "2.0" } }
+
+    before do
+      @index = build_index do
+        gem "foo", %w[1.0 2.0]
+        gem("parent", "1.0") { dep "foo", ">= 0" }
+      end
+      @index.each {|spec| spec.source = source }
+      allow(package).to receive(:platform_specs).and_call_original
+    end
+
+    it "does not platform-match excluded versions or remove them from the source index" do
+      expect(package).to receive(:platform_specs).with([foo_one]).and_call_original
+      expect(package).not_to receive(:platform_specs).with([foo_two])
+
+      expect(resolver.start.map(&:full_name)).to eq(["foo-1.0"])
+      expect(@index.search("foo")).to eq([foo_one, foo_two])
+    end
+
+    context "with a range requirement" do
+      let(:dependencies) { [Bundler::Dependency.new("foo", "< 2.0")] }
+
+      it "does not platform-match versions outside the range" do
+        expect(package).to receive(:platform_specs).with([foo_one]).and_call_original
+        expect(package).not_to receive(:platform_specs).with([foo_two])
+
+        expect(resolver.start.map(&:full_name)).to eq(["foo-1.0"])
+      end
+    end
+
+    context "with an excluded version in the base specs" do
+      let(:base_specs) { Bundler::SpecSet.new([Bundler::LazySpecification.from_spec(foo_two)]) }
+
+      it "filters the merged base and source specs" do
+        base.base_requirements["foo"] = Gem::Requirement.default
+        expect(package).not_to receive(:platform_specs).with([foo_two])
+
+        expect(resolver.start.map(&:full_name)).to eq(["foo-1.0"])
+      end
+    end
+
+    context "with active overrides" do
+      let(:overrides) { [Bundler::Override.new("unused", :version, "= 1.0")] }
+
+      it "retains the existing candidate preparation path" do
+        expect(package).to receive(:platform_specs).with([foo_two]).and_call_original
+
+        expect(resolver.start.map(&:full_name)).to eq(["foo-1.0"])
+      end
+    end
+
+    context "with a gemspec source" do
+      let(:source) { Bundler::Source::Gemspec.new("path" => ".", "root_path" => bundled_app) }
+
+      it "preserves the exemption from version requirements" do
+        allow(source).to receive(:specs).and_return(@index)
+        expect(package).to receive(:platform_specs).with([foo_two]).and_call_original
+
+        expect(resolver.start.map(&:full_name)).to eq(["foo-2.0"])
+      end
+    end
+
+    context "with a transitive package" do
+      let(:dependencies) { [Bundler::Dependency.new("parent", ">= 0")] }
+      let(:originally_locked) { Bundler::SpecSet.new([foo_one]) }
+
+      it "does not treat the locked version as a direct requirement" do
+        expect(package).not_to be_top_level
+        expect(package).to receive(:platform_specs).with([foo_two]).and_call_original
+
+        expect(resolver.start.map(&:full_name).sort).to eq(%w[foo-2.0 parent-1.0])
+      end
+    end
+  end
+
   it "resolves a conflicting index" do
     @index = a_conflict_index
     dep "my_app"
