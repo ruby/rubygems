@@ -17,9 +17,16 @@ class Gem::Resolver::InstallerSet < Gem::Resolver::Set
 
   ##
   # Do not look in the installed set when finding specifications.  This is
-  # used by the --install-dir option to `gem install`
+  # used by the --no-minimal-deps option to `gem install`, and by
+  # --install-dir together with --build-root
 
   attr_accessor :ignore_installed # :nodoc:
+
+  ##
+  # Only look for installed specifications in this directory.  This is used
+  # by the --install-dir option to `gem install`
+
+  attr_accessor :install_dir # :nodoc:
 
   ##
   # The remote_set looks up remote gems for installation.
@@ -142,7 +149,7 @@ class Gem::Resolver::InstallerSet < Gem::Resolver::Set
 
     name = dep.name
 
-    dep.matching_specs.each do |gemspec|
+    installed_specs(dep).each do |gemspec|
       next if @always_install.any? {|spec| spec.name == gemspec.name }
 
       res << Gem::Resolver::InstalledSpecification.new(self, gemspec)
@@ -242,6 +249,19 @@ class Gem::Resolver::InstallerSet < Gem::Resolver::Set
   end
 
   private
+
+  def installed_specs(dep)
+    return dep.matching_specs unless @install_dir
+
+    @install_dir_record ||= Gem::SpecificationRecord.from_path(@install_dir)
+
+    # Ignored specs are left out as in Gem::Dependency#matching_specs, and
+    # default gems because Gem::Installer only accepts dependencies that are
+    # installed in the install dir
+    @install_dir_record.find_all_by_name(dep.name, dep.requirement).reject do |spec|
+      spec.default_gem? || spec.ignored?
+    end
+  end
 
   def metadata_satisfied?(spec)
     spec.required_ruby_version.satisfied_by?(Gem.ruby_version) &&
