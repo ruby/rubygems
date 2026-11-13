@@ -899,6 +899,21 @@ if you believe they were disclosed to a third party.
     assert_nil @cfg.ssl_ca_cert
   end
 
+  def test_load_file_with_anchored_block_mapping_and_alias
+    File.open @temp_conf, "w" do |fp|
+      fp.puts "defaults: &defaults"
+      fp.puts "  :verbose: false"
+      fp.puts "other: *defaults"
+      fp.puts ":backtrace: false"
+    end
+
+    util_config_file
+
+    assert_equal({ verbose: false }, @cfg[:defaults])
+    assert_equal({ verbose: false }, @cfg[:other])
+    assert_equal false, @cfg.backtrace
+  end
+
   def test_accept_string_key
     File.open @temp_conf, "w" do |fp|
       fp.puts "verbose: false"
