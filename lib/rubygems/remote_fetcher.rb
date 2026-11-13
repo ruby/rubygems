@@ -51,6 +51,11 @@ class Gem::RemoteFetcher
   REMOTE_SCHEMES = %w[http https s3].freeze
   private_constant :REMOTE_SCHEMES
 
+  # Longest host part of a global gem cache slug, so that the slug fits a
+  # file name: 255 minus dot minus MD5 length. Same as Bundler's.
+  MAX_CACHE_SLUG_HOST_SIZE = 255 - 1 - 32
+  private_constant :MAX_CACHE_SLUG_HOST_SIZE
+
   @fetcher = nil
 
   ##
@@ -130,8 +135,8 @@ class Gem::RemoteFetcher
     cache_dir =
       if File.identical?(".", install_dir) # gem fetch asks for it this way
         install_dir
-      elsif Gem.configuration.global_gem_cache && remote_source && ensure_writable_cache_dir(Gem.global_gem_cache_path)
-        Gem.global_gem_cache_path
+      elsif remote_source && (global_cache_dir = global_gem_cache_dir(source_uri))
+        global_cache_dir
       elsif File.writable?(install_cache_dir) || (File.writable?(install_dir) && !File.exist?(install_cache_dir))
         install_cache_dir
       else
@@ -365,6 +370,62 @@ class Gem::RemoteFetcher
     end
 
     File.writable?(cache_dir)
+  end
+
+  # The directory of the global gem cache that holds gems from +source_uri+,
+  # or nil when the global gem cache is disabled, cannot be written, or
+  # cannot be keyed by source. Each source gets its own subdirectory so that
+  # a gem downloaded from one source is never served for an install from
+  # another source that has a gem of the same name and version.
+
+  def global_gem_cache_dir(source_uri)
+    return unless Gem.configuration.global_gem_cache
+    return unless slug = global_gem_cache_slug(source_uri)
+
+    cache_dir = File.join Gem.global_gem_cache_path, slug
+    cache_dir if ensure_writable_cache_dir(cache_dir)
+  end
+
+  # The subdirectory of the global gem cache for +source_uri+, in the layout
+  # of Bundler::Source::Rubygems::Remote#cache_slug so that both tools share
+  # the cached gems of a source: the host, user and port of the URI followed
+  # by the MD5 of those parts plus the path. Returns nil when MD5 is not
+  # available, under FIPS for instance, in which case the global gem cache
+  # is not used.
+
+  def global_gem_cache_slug(source_uri)
+    return unless md5_available?
+
+    # Bundler keys its slugs by the source with a trailing slash.
+    path = source_uri.path.to_s
+    path = "#{path}/" unless path.end_with?("/")
+
+    uri_parts = [source_uri.host, source_uri.user, source_uri.port, path]
+    uri_parts.compact!
+
+    require "digest"
+    uri_digest = Digest::MD5.hexdigest(uri_parts.join("."))
+
+    uri_parts.pop
+    host_parts = uri_parts.join(".")
+    return uri_digest if host_parts.empty?
+
+    [host_parts[0...MAX_CACHE_SLUG_HOST_SIZE], uri_digest].join(".")
+  end
+
+  def md5_available?
+    return @md5_available if defined?(@md5_available)
+
+    @md5_available =
+      begin
+        require "openssl"
+        OpenSSL::Digest.digest("MD5", "")
+        true
+      rescue LoadError
+        true
+      rescue OpenSSL::Digest::DigestError
+        false
+      end
   end
 
   def atomic_copy(source_path, destination_path)
