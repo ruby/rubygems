@@ -158,6 +158,11 @@ RSpec.describe Bundler::LockfileParser do
       expect(subject.sources.map(&:dependency_names)).to eq([["peiji-san"], ["rake"]])
     end
 
+    context "with Windows line endings" do
+      let(:lockfile_contents) { super().gsub("\n", "\r\n") }
+      include_examples "parsing"
+    end
+
     context "when a spec has a content address" do
       let(:lockfile_contents) do
         <<~L
