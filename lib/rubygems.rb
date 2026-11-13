@@ -970,9 +970,39 @@ An Array (#{env.inspect}) was passed in from #{caller[3]}
 
   ##
   # Returns the version of the latest release-version of gem +name+
+  #
+  # When a +cooldown+ of N days is given, versions published within the last N
+  # days will be excluded. Versions whose publish time is unknown are never
+  # excluded, so sources that do not provide publish times keep working.
 
-  def self.latest_version_for(name)
-    latest_spec_for(name)&.version
+  def self.latest_version_for(name, cooldown: nil)
+    unless cooldown.nil?
+      require_relative "rubygems/cooldown"
+
+      if Gem::CooldownSettings.invalid?(cooldown)
+        raise ArgumentError, "invalid cooldown #{cooldown.inspect}, expected a non-negative integer number of days"
+      end
+
+      cooldown = Gem::Cooldown.new(cooldown)
+    end
+
+    return latest_spec_for(name)&.version unless cooldown&.active?
+
+    dependency   = Gem::Dependency.new name
+    fetcher      = Gem::SpecFetcher.fetcher
+    spec_tuples, = fetcher.search_for_dependency dependency, type: :released
+
+    with_times = spec_tuples.map do |tup, source|
+      [tup, source, source.created_at_for_tuple(tup)]
+    end
+
+    if !with_times.empty? && with_times.none? {|_, _, created_at| created_at }
+      Gem::Cooldown.warn_missing_created_at with_times.first[1]
+    end
+
+    tuple, = with_times.reject {|_, _, created_at| cooldown.skip?(created_at) }.last
+
+    tuple&.version
   end
 
   ##
