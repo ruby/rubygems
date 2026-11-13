@@ -167,4 +167,24 @@ class TestGemCompactIndexClientParser < Gem::TestCase
     assert parser.available?
     assert_equal 1, parser.info("a").size
   end
+
+  def test_info_skips_blank_and_whitespace_only_lines
+    index = FakeIndex.new(versions: "---\na 1.0.0,1.1.0 aaa111\n",
+                          info: { "a" => "---\n1.0.0 |checksum:abc\n\n \n1.1.0 |checksum:def\n\n" })
+    parser = Gem::CompactIndexClient::Parser.new(index)
+
+    info = parser.info("a")
+
+    assert_equal [["a", "1.0.0"], ["a", "1.1.0"]], info.map {|row| row.first(2) }
+  end
+
+  def test_info_skips_lines_without_a_version
+    index = FakeIndex.new(versions: "---\na 1.0.0,1.1.0 aaa111\n",
+                          info: { "a" => "---\n1.0.0 |checksum:abc\nnot a version |checksum:bad\n1.1.0 |checksum:def\n" })
+    parser = Gem::CompactIndexClient::Parser.new(index)
+
+    info = parser.info("a")
+
+    assert_equal [["a", "1.0.0"], ["a", "1.1.0"]], info.map {|row| row.first(2) }
+  end
 end
