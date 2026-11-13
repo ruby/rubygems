@@ -24,6 +24,48 @@ class TestGemResolverInstallerSet < Gem::TestCase
     assert_equal dep("b"), e.dependency.dependency
   end
 
+  def test_add_always_install_with_explicit_source_ignores_other_sources
+    spec_fetcher do |fetcher|
+      fetcher.download "a", 3
+    end
+
+    spec_fetcher "http://other.example/" do |fetcher|
+      fetcher.download "a", 1
+    end
+
+    Gem.sources << "http://other.example/"
+
+    set = Gem::Resolver::InstallerSet.new :both
+    set.explicit_sources = ["http://other.example/"]
+
+    set.add_always_install dep("a")
+
+    # Even though the default source has a newer a-3, the gem named on the
+    # command line must come from the explicitly requested source (a-1).
+    assert_equal %w[a-1], set.always_install.map(&:full_name)
+  end
+
+  def test_add_always_install_with_explicit_source_does_not_fall_back
+    spec_fetcher do |fetcher|
+      fetcher.download "a", 1
+    end
+
+    spec_fetcher "http://other.example/" do |fetcher|
+      fetcher.download "b", 1
+    end
+
+    Gem.sources << "http://other.example/"
+
+    set = Gem::Resolver::InstallerSet.new :both
+    set.explicit_sources = ["http://other.example/"]
+
+    # 'a' only exists on the default source, so requesting it from the explicit
+    # source must fail instead of silently falling back.
+    assert_raise Gem::UnsatisfiableDependencyError do
+      set.add_always_install dep("a")
+    end
+  end
+
   def test_add_always_install_errors
     @stub_fetcher = Gem::FakeFetcher.new
     Gem::RemoteFetcher.fetcher = @stub_fetcher
