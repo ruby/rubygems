@@ -137,8 +137,11 @@ module Gem
 
         pos = indent
         if /\G&/.match?(line, indent) && (anchor = consume_anchor)
+          # A lone anchor line, e.g. "--- &1", anchors the node on the next line.
+          skip_blank_and_comments
+          return register_anchor(anchor, nil) if @lines.empty? || current_indent < base_indent
           line = @lines[0]
-          pos = indent_of(line)
+          indent = pos = indent_of(line)
         end
 
         if SEQUENCE_ENTRY_RE.match?(line, pos)
@@ -177,7 +180,7 @@ module Gem
           content = line[indent + 1, line.size]
           content.strip!
           item_anchor = nil
-          item_anchor, content = extract_item_anchor(content) if content.start_with?("&")
+          item_anchor, content = extract_anchor(content) if content.start_with?("&")
           item = parse_sequence_item(content, indent)
           items << register_anchor(item_anchor, item)
         end
@@ -189,7 +192,7 @@ module Gem
           parse_inline_alias(content)
         elsif content.empty?
           skip_blank_and_comments
-          @lines.any? && current_indent > indent ? parse_node(indent) : nil
+          @lines.any? && current_indent > indent ? parse_node(indent + 1) : nil
         elsif content.start_with?("!ruby/object:")
           parse_tagged_content(content.strip, indent)
         elsif content.start_with?("!binary ")
@@ -232,7 +235,7 @@ module Gem
           val = strip_comment(val || "")
 
           val_anchor = nil
-          val_anchor, val = consume_value_anchor(val) if val.start_with?("&")
+          val_anchor, val = extract_anchor(val) if val.start_with?("&")
           value = parse_mapping_value(val, indent)
           value = register_anchor(val_anchor, value) if val_anchor
 
@@ -449,29 +452,28 @@ module Gem
       def consume_anchor
         line = @lines[0]
         stripped = line.lstrip
-        return nil unless stripped.start_with?("&") && stripped =~ /^&(\S+)\s+/
+        return nil unless stripped.start_with?("&") && stripped =~ /^&(\S+)\s*/
 
         anchor = $1
-        @lines[0] = line.sub(/&#{Regexp.escape(anchor)}\s+/, "")
+        if $'.empty?
+          @lines.shift
+        else
+          @lines[0] = line.sub(/&#{Regexp.escape(anchor)}\s+/, "")
+        end
         anchor
       end
 
-      def extract_item_anchor(content)
+      def extract_anchor(content)
         return [nil, content] unless content =~ /^&(\S+)/
 
         anchor = $1
         [anchor, content.sub(/^&#{Regexp.escape(anchor)}\s*/, "")]
       end
 
-      def consume_value_anchor(val)
-        return [nil, val] unless val =~ /^&(\S+)\s+/
-
-        anchor = $1
-        [anchor, val.sub(/^&#{Regexp.escape(anchor)}\s+/, "")]
-      end
-
       def register_anchor(name, node)
         if name
+          # An anchored empty node still defines the anchor, as a null.
+          node ||= Scalar.new(nil)
           @anchors[name] = node
           node.anchor = name if node.respond_to?(:anchor=)
         end
@@ -531,14 +533,16 @@ module Gem
     class Builder
       VALID_OPS = %w[= != > < >= <= ~>].freeze
       ARRAY_FIELDS = %w[files test_files executables extra_rdoc_files].freeze
-      MAX_ALIAS_RESOLUTIONS = 1_000
+      MAX_ALIAS_EXPANSION = 100_000
 
       def initialize(permitted_classes: [], permitted_symbols: [], aliases: true)
         @permitted_classes = permitted_classes.map {|c| "!ruby/object:#{c}" }
         @permitted_symbols = permitted_symbols
         @aliases = aliases
         @anchor_values = {}
-        @alias_count = 0
+        @anchor_sizes = {}
+        @expanded_size = 0
+        @alias_expansion = 0
       end
 
       def build(node)
@@ -556,31 +560,40 @@ module Gem
       private
 
       def build_node(node)
+        start = @expanded_size
         case node
         when nil then nil
         when AliasRef then resolve_alias(node)
-        when Scalar then store_anchor(node.anchor, node.value)
-        when Mapping then build_mapping(node)
-        when Sequence then store_anchor(node.anchor, node.items.map {|item| build_node(item) })
+        when Scalar then store_anchor(node.anchor, node.value, start)
+        when Mapping then store_anchor(node.anchor, build_mapping(node), start)
+        when Sequence then store_anchor(node.anchor, node.items.map {|item| build_node(item) }, start)
         else node # already a Ruby object
         end
       end
 
       def resolve_alias(node)
         raise Psych::AliasesNotEnabled unless @aliases
-        @alias_count += 1
-        if @alias_count > MAX_ALIAS_RESOLUTIONS
-          raise Psych::BadAlias, "exceeded maximum alias resolutions (#{MAX_ALIAS_RESOLUTIONS})"
-        end
         unless @anchor_values.key?(node.name)
-          klass = defined?(Psych::AnchorNotDefined) ? Psych::AnchorNotDefined : Psych::BadAlias
-          raise klass, "An alias referenced an unknown anchor: #{node.name}"
+          raise Psych::AnchorNotDefined, node.name if defined?(Psych::AnchorNotDefined)
+          raise Psych::BadAlias, "An alias referenced an unknown anchor: #{node.name}"
+        end
+        # Charge the expanded size of the anchor, weighing scalars by length,
+        # so neither nested aliases nor aliases to a long string blow up.
+        size = @anchor_sizes.fetch(node.name)
+        @expanded_size += size
+        @alias_expansion += size
+        if @alias_expansion > MAX_ALIAS_EXPANSION
+          raise Psych::BadAlias, "exceeded maximum alias expansion (#{MAX_ALIAS_EXPANSION})"
         end
         @anchor_values.fetch(node.name)
       end
 
-      def store_anchor(name, value)
-        @anchor_values[name] = value if name
+      def store_anchor(name, value, start)
+        @expanded_size += value.is_a?(String) ? 1 + value.bytesize : 1
+        if name
+          @anchor_values[name] = value
+          @anchor_sizes[name] = @expanded_size - start
+        end
         value
       end
 
@@ -606,7 +619,7 @@ module Gem
                    raise ArgumentError, "undefined class/module #{node.tag.sub("!ruby/object:", "")}"
         end
 
-        store_anchor(node.anchor, result)
+        result
       end
 
       def build_hash(node)
