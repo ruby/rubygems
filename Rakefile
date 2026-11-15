@@ -149,7 +149,7 @@ end
 namespace :vendor do
   desc "Download vendored gems to tmp"
   task :bundle do
-    sh({ "BUNDLE_PATH" => "../../tmp/vendor", "BUNDLER_GEM_DEFAULT_DIR" => "../../tmp/vendor", "RUBYOPT" => "--disable-gems -r#{File.expand_path("spec/support/hax.rb", __dir__)} -Ilib" }, "bin/bundle", "install", "--gemfile=tool/bundler/vendor_gems.rb")
+    sh({ "BUNDLE_PATH" => "../../tmp/vendor", "BUNDLER_GEM_DEFAULT_DIR" => "../../tmp/vendor", "RUBYOPT" => "-r#{File.expand_path("spec/support/hax.rb", __dir__)} -Ilib" }, "bin/bundle", "install", "--gemfile=tool/bundler/vendor_gems.rb")
   end
 
   desc "Install patched vendored gems"

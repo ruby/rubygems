@@ -15,6 +15,7 @@ AllCops:
     - lib/rubygems/vendor/**/*
     - lib/bundler/vendor/**/*
     - spec/support/vendor/**/*
+    - tool/bench/scenarios/**/*
   CacheRootDirectory: tmp/rubocop
   MaxFilesInCache: 5000
 

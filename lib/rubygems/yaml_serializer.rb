@@ -16,34 +16,37 @@ end
 
 module Gem
   module YAMLSerializer
-    Scalar = Struct.new(:value, :tag, :anchor, keyword_init: true)
-
-    Mapping = Struct.new(:pairs, :tag, :anchor, keyword_init: true) do
-      def initialize(pairs: [], tag: nil, anchor: nil)
-        super
-      end
-    end
-
-    Sequence = Struct.new(:items, :tag, :anchor, keyword_init: true) do
-      def initialize(items: [], tag: nil, anchor: nil)
-        super
-      end
-    end
-
-    AliasRef = Struct.new(:name, keyword_init: true)
+    Scalar = Struct.new(:value, :tag, :anchor)
+    Mapping = Struct.new(:pairs, :tag, :anchor)
+    Sequence = Struct.new(:items, :tag, :anchor)
+    AliasRef = Struct.new(:name)
 
     class Parser
       # A plain (unquoted) mapping key followed by ":". "#" inside a key is
       # literal unless preceded by a space (which would start a comment).
-      MAPPING_KEY_RE = /^((?:[^#:\s]|:[^ ])(?:[^#:]|:[^ ]|(?<=[^ ])#)*):(?:[ ]+(.*))?$/
+      # Like Psych, spaces and tabs may separate the ":" from the value.
+      MAPPING_KEY_RE = /\G((?:[^#:\s]|:[^ \t])(?:[^#:]|:[^ \t]|(?<=[^ ])#)*):(?:[ \t]+(.*))?$/
       # A quoted mapping key followed by ":". A whole-line quoted scalar
       # cannot match because its closing quote is at the end of the line.
-      QUOTED_KEY_RE = /^("(?:[^"\\]|\\.)*"|'(?:[^']|'')*'):(?:[ ]+(.*))?$/
+      QUOTED_KEY_RE = /\G("(?:[^"\\]|\\.)*"|'(?:[^']|'')*'):(?:[ \t]+(.*))?$/
+      # An entry of a flow sequence. A quoted entry may contain commas.
+      FLOW_SEQUENCE_ENTRY_RE = /"(?:[^"\\]|\\.)*"|'(?:[^']|'')*'|[^,\s](?:[^,]*[^,\s])?/
+      SEQUENCE_ENTRY_RE = /\G-(?: |\z)/
+      # A quoted scalar whose closing quote is on a later line.
+      OPEN_QUOTED_RE = /\A(?:! )?(?:"(?>(?:[^"\\]|\\.)*)(\\)?|'(?>(?:[^']|'')*))\z/
+      RUBY_OBJECT_TAG_RE = %r{\G!ruby/object:}
+      LSTRIP_BYTES = [0, 9, 10, 11, 12, 13, 32].freeze
+      UTF8_BOM_BYTES = [0xEF, 0xBB, 0xBF].freeze
       MAX_NESTING_DEPTH = 1_000
+      NULL_SCALARS = %w[~ null].freeze
+      BLANK_RE = /\A[\0\s]*\z/
+      BLANK_OR_COMMENT_RE = /\A[\0\s]*(?:#|\z)/
+      DOCUMENT_END_RE = /\A\.\.\.(?:[ \t]|\z)/
 
       STRING_UNESCAPES = {
         "\\\\" => "\\",
         "\\\"" => "\"",
+        "\\ " => " ",
         "\\0" => "\0",
         "\\a" => "\a",
         "\\b" => "\b",
@@ -53,12 +56,25 @@ module Gem
         "\\f" => "\f",
         "\\r" => "\r",
         "\\e" => "\e",
+        "\\N" => "\u0085",
+        "\\_" => "\u00A0",
+        "\\L" => "\u2028",
+        "\\P" => "\u2029",
       }.freeze
 
       def initialize(source)
-        @lines = source.split(/\r?\n/)
+        raise TypeError, "no implicit conversion of nil into String" if source.nil?
+
+        source = strip_bom(source)
+        # Keep trailing empty lines, which a block scalar with keep chomping
+        # ("|+") preserves, but not the empty string after the final line
+        # break.
+        @lines = source.split(/\r?\n/, -1)
+        @lines.pop if @lines.last == ""
+        @lines.each(&:freeze)
         @anchors = {}
         @depth = 0
+        strip_document_end
         strip_document_prefix
       end
 
@@ -82,6 +98,19 @@ module Gem
 
       private
 
+      # Byte-wise, as checksums.yaml is read as binary unlike config files,
+      # and binary cannot be compared with a UTF-8 string holding the BOM.
+      def strip_bom(source)
+        return source unless UTF8_BOM_BYTES.each_with_index.all? {|byte, i| source.getbyte(i) == byte }
+
+        source.byteslice(UTF8_BOM_BYTES.size..)
+      end
+
+      def strip_document_end
+        index = @lines.index {|line| DOCUMENT_END_RE.match?(line) }
+        @lines.slice!(index..) if index
+      end
+
       def strip_document_prefix
         return if @lines.empty?
         return unless @lines[0]&.start_with?("---")
@@ -101,37 +130,38 @@ module Gem
         return nil if @lines.empty?
 
         line = @lines[0]
-        stripped = line.lstrip
-        indent = line.size - stripped.size
+        indent = indent_of(line)
         return nil if indent < base_indent
 
-        return parse_alias_ref if stripped.start_with?("*")
+        return parse_alias_ref if /\G\*/.match?(line, indent)
 
-        anchor = consume_anchor
-
-        if anchor
+        pos = indent
+        if /\G&/.match?(line, indent) && (anchor = consume_anchor)
+          # A lone anchor line, e.g. "--- &1", anchors the node on the next line.
+          skip_blank_and_comments
+          return register_anchor(anchor, nil) if @lines.empty? || current_indent < base_indent
           line = @lines[0]
-          stripped = line.lstrip
+          indent = pos = indent_of(line)
         end
 
-        if stripped.start_with?("- ") || stripped == "-"
+        if SEQUENCE_ENTRY_RE.match?(line, pos)
           parse_sequence(indent, anchor)
-        elsif QUOTED_KEY_RE.match?(stripped)
+        elsif QUOTED_KEY_RE.match?(line, pos)
           # A mapping whose key is quoted, e.g. '"have: colon": value'.
           parse_mapping(indent, anchor)
-        elsif (stripped.start_with?("\"") && stripped.end_with?("\"")) ||
-              (stripped.start_with?("'") && stripped.end_with?("'"))
+        elsif (/\G"/.match?(line, pos) && line.end_with?("\"")) ||
+              (/\G'/.match?(line, pos) && line.end_with?("'"))
           # A whole-line quoted scalar, e.g. '"system: foo: bar"'. It may
           # contain ": ", so it must be checked before MAPPING_KEY_RE.
           parse_plain_scalar(indent, anchor)
-        elsif stripped =~ MAPPING_KEY_RE && !stripped.start_with?("!ruby/object:")
+        elsif MAPPING_KEY_RE.match?(line, pos) && !RUBY_OBJECT_TAG_RE.match?(line, pos)
           parse_mapping(indent, anchor)
-        elsif stripped.start_with?("!ruby/object:")
+        elsif RUBY_OBJECT_TAG_RE.match?(line, pos)
           parse_tagged_node(indent, anchor)
-        elsif stripped.start_with?("|")
-          modifier = stripped[1..].to_s.strip
+        elsif /\G\|/.match?(line, pos)
+          modifier = line[pos + 1, line.size].strip
           @lines.shift
-          register_anchor(anchor, Scalar.new(value: parse_block_scalar(indent, modifier)))
+          register_anchor(anchor, Scalar.new(parse_block_scalar(indent, modifier)))
         else
           parse_plain_scalar(indent, anchor)
         end
@@ -142,23 +172,27 @@ module Gem
       def parse_sequence(indent, anchor)
         items = []
         while @lines.any?
+          skip_blank_and_comments
+          break if @lines.empty?
           line = @lines[0]
-          stripped = line.lstrip
-          break unless line.size - stripped.size == indent &&
-                       (stripped.start_with?("- ") || stripped == "-")
-          content = @lines.shift.lstrip[1..].strip
-          item_anchor, content = extract_item_anchor(content)
+          break unless indent_of(line) == indent && SEQUENCE_ENTRY_RE.match?(line, indent)
+          @lines.shift
+          content = line[indent + 1, line.size]
+          content.strip!
+          item_anchor = nil
+          item_anchor, content = extract_anchor(content) if content.start_with?("&")
           item = parse_sequence_item(content, indent)
           items << register_anchor(item_anchor, item)
         end
-        register_anchor(anchor, Sequence.new(items: items))
+        register_anchor(anchor, Sequence.new(items))
       end
 
       def parse_sequence_item(content, indent)
         if content.start_with?("*")
           parse_inline_alias(content)
         elsif content.empty?
-          @lines.any? && current_indent > indent ? parse_node(indent) : nil
+          skip_blank_and_comments
+          @lines.any? && current_indent > indent ? parse_node(indent + 1) : nil
         elsif content.start_with?("!ruby/object:")
           parse_tagged_content(content.strip, indent)
         elsif content.start_with?("!binary ")
@@ -167,11 +201,12 @@ module Gem
           @lines.unshift("#{" " * (indent + 2)}#{content}")
           parse_node(indent)
         elsif QUOTED_KEY_RE.match?(content) ||
-              (content =~ MAPPING_KEY_RE && !content.start_with?("!ruby/object:"))
+              (MAPPING_KEY_RE.match?(content) && !content.start_with?("!ruby/object:") &&
+               !OPEN_QUOTED_RE.match?(content))
           @lines.unshift("#{" " * (indent + 2)}#{content}")
           parse_node(indent)
         elsif content.start_with?("|")
-          Scalar.new(value: parse_block_scalar(indent, content[1..].to_s.strip))
+          Scalar.new(parse_block_scalar(indent, content[1..].to_s.strip))
         else
           parse_inline_scalar(content, indent)
         end
@@ -180,28 +215,33 @@ module Gem
       def parse_mapping(indent, anchor)
         pairs = []
         while @lines.any?
+          skip_blank_and_comments
+          break if @lines.empty?
           line = @lines[0]
-          stripped = line.lstrip
-          break unless line.size - stripped.size == indent
+          break unless indent_of(line) == indent
 
-          if (match = QUOTED_KEY_RE.match(stripped))
+          if (match = QUOTED_KEY_RE.match(line, indent))
             key = coerce(match[1])
-          elsif (match = MAPPING_KEY_RE.match(stripped)) && !stripped.start_with?("!ruby/object:")
-            key = match[1].strip
+          elsif (match = MAPPING_KEY_RE.match(line, indent)) && !RUBY_OBJECT_TAG_RE.match?(line, indent)
+            key = match[1]
+            key.strip!
             key = decode_binary_tag(key) if key.start_with?("!binary ")
           else
             break
           end
           @lines.shift
-          val = strip_comment(match[2].to_s.strip)
+          val = match[2]
+          val&.strip!
+          val = strip_comment(val || "")
 
-          val_anchor, val = consume_value_anchor(val)
+          val_anchor = nil
+          val_anchor, val = extract_anchor(val) if val.start_with?("&")
           value = parse_mapping_value(val, indent)
           value = register_anchor(val_anchor, value) if val_anchor
 
-          pairs << [Scalar.new(value: key), value]
+          pairs << key << value
         end
-        register_anchor(anchor, Mapping.new(pairs: pairs))
+        register_anchor(anchor, Mapping.new(pairs))
       end
 
       def parse_mapping_value(val, indent)
@@ -212,25 +252,19 @@ module Gem
         elsif val.start_with?("!binary ")
           parse_binary_value(val, indent)
         elsif val.empty?
-          next_stripped = nil
-          next_indent = nil
-          if @lines.any?
-            next_stripped = @lines[0].lstrip
-            next_indent = @lines[0].size - next_stripped.size
-          end
-          if next_stripped &&
-             (next_stripped.start_with?("- ") || next_stripped == "-") &&
-             next_indent == indent
+          skip_blank_and_comments
+          line = @lines[0]
+          if line && indent_of(line) == indent && SEQUENCE_ENTRY_RE.match?(line, indent)
             parse_node(indent)
           else
             parse_node(indent + 1)
           end
         elsif val == "[]"
-          Sequence.new
+          Sequence.new([])
         elsif val == "{}"
-          Mapping.new
+          Mapping.new([])
         elsif val.start_with?("|")
-          Scalar.new(value: parse_block_scalar(indent, val[1..].to_s.strip))
+          Scalar.new(parse_block_scalar(indent, val[1..].to_s.strip))
         else
           parse_inline_scalar(val, indent)
         end
@@ -253,21 +287,24 @@ module Gem
           node.anchor = anchor
           node
         else
-          Mapping.new(pairs: [[Scalar.new(value: "value"), node]], tag: tag, anchor: anchor)
+          Mapping.new(["value", node], tag, anchor)
         end
       end
 
       def parse_block_scalar(base_indent, modifier)
         parts = []
-        block_indent = nil
+        indentation = modifier[/\A[+-]?([1-9])/, 1]
+        chomping = modifier[/\A[1-9]?([+-])/, 1]
+        block_indent = indentation && base_indent + indentation.to_i
 
         while @lines.any?
           line = @lines[0]
-          if line.strip.empty?
+          if BLANK_RE.match?(line)
+            parts << line[block_indent..] if block_indent && line.size > block_indent
             parts << "\n"
             @lines.shift
           else
-            line_indent = line.size - line.lstrip.size
+            line_indent = indent_of(line)
             break if line_indent <= base_indent
             block_indent ||= line_indent
             parts << @lines.shift[block_indent..].to_s << "\n"
@@ -275,30 +312,54 @@ module Gem
         end
 
         res = parts.join
-        res.chomp! if modifier == "-" && res.end_with?("\n")
+        unless chomping == "+"
+          res.delete_suffix!("\n") while res.end_with?("\n")
+          # Clipping keeps the final line break but drops trailing empty lines.
+          res << "\n" if chomping.nil? && !res.empty?
+        end
         res
       end
 
       def parse_plain_scalar(indent, anchor)
-        result = coerce(@lines.shift.strip)
+        val = @lines.shift.strip
+        result = coerce(val)
         return register_anchor(anchor, result) if result.is_a?(Mapping) || result.is_a?(Sequence)
 
-        while result.is_a?(String) && @lines.any? &&
-              !@lines[0].strip.empty? && current_indent > indent
-          result << " " << @lines.shift.strip
-        end
-        register_anchor(anchor, Scalar.new(value: result))
+        fold_continuation_lines(result, val, indent)
+        register_anchor(anchor, Scalar.new(result))
       end
 
       def parse_inline_scalar(val, indent)
         result = coerce(val)
         return result if result.is_a?(Mapping) || result.is_a?(Sequence)
 
-        while result.is_a?(String) && @lines.any? &&
-              !@lines[0].strip.empty? && current_indent > indent
+        fold_continuation_lines(result, val, indent)
+        Scalar.new(result)
+      end
+
+      def fold_continuation_lines(result, val, indent)
+        return unless result.is_a?(String)
+
+        return result.replace(fold_quoted_lines(val.delete_prefix("! "), indent)) if OPEN_QUOTED_RE.match?(val)
+
+        while @lines.any? && !BLANK_OR_COMMENT_RE.match?(@lines[0]) && current_indent > indent
           result << " " << @lines.shift.strip
         end
-        Scalar.new(value: result)
+      end
+
+      def fold_quoted_lines(val, indent)
+        open = OPEN_QUOTED_RE.match(val)
+        breaks = +""
+        while open && @lines.any? && (BLANK_RE.match?(@lines[0]) || current_indent > indent)
+          line = @lines.shift.strip
+          next breaks << "\n" if line.empty?
+
+          val.chop! if open[1]
+          val << (breaks.empty? && !open[1] ? " " : breaks) << line
+          breaks.clear
+          open = OPEN_QUOTED_RE.match("#{val[0]}#{line}")
+        end
+        coerce(val)
       end
 
       def coerce(val, depth = 0)
@@ -306,25 +367,30 @@ module Gem
 
         val = val.sub(/^! /, "") if val.start_with?("! ")
 
-        if val =~ /^"(.*)"$/
-          $1.gsub(/\\(?:["\\0abtnvfre]|x\h{2})/) do |m|
-            STRING_UNESCAPES[m] || m[2..].to_i(16).chr(Encoding::UTF_8)
+        if val.size >= 2 && val.start_with?("\"") && val.end_with?("\"")
+          inner = val[1..-2]
+          return inner unless inner.include?("\\")
+          inner.gsub(/\\(?:["\\ 0abtnvfreN_LP]|x\h{2}|u\h{4}|U\h{8})/) do |m|
+            char = STRING_UNESCAPES[m] || unescape_code_point(m)
+            # Metadata is read as binary, where non-ASCII text stays as UTF-8 bytes.
+            Encoding.compatible?(inner, char) ? char : char.b
           end
-        elsif val =~ /^'(.*)'$/
-          $1.gsub(/''/, "'")
+        elsif val.size >= 2 && val.start_with?("'") && val.end_with?("'")
+          inner = val[1..-2]
+          inner.include?("''") ? inner.gsub("''", "'") : inner
         elsif val == "true"
           true
         elsif val == "false"
           false
-        elsif ["~", "null"].include?(val)
+        elsif NULL_SCALARS.include?(val)
           nil
         elsif val == "{}"
-          Mapping.new
+          Mapping.new([])
         elsif val =~ /^\[(.*)\]$/
           inner = $1.strip
-          return Sequence.new if inner.empty?
-          items = inner.split(/\s*,\s*/).reject(&:empty?).map {|e| Scalar.new(value: coerce(e, depth + 1)) }
-          Sequence.new(items: items)
+          return Sequence.new([]) if inner.empty?
+          items = inner.scan(FLOW_SEQUENCE_ENTRY_RE).map {|e| Scalar.new(coerce(e, depth + 1)) }
+          Sequence.new(items)
         elsif /\A\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}:\d{2})?/.match?(val)
           begin
             Time.new(val)
@@ -343,6 +409,12 @@ module Gem
         end
       end
 
+      def unescape_code_point(escape)
+        code = escape[2..].hex
+        return escape if code > 0x10FFFF || code.between?(0xD800, 0xDFFF)
+        code.chr(Encoding::UTF_8)
+      end
+
       def decode_binary_tag(str)
         content = str.sub(/\A!binary\s+/, "")
         content = $1 if content =~ /\A"(.*)"\z/ || content =~ /\A'(.*)'\z/
@@ -353,51 +425,55 @@ module Gem
         rest = val.sub(/\A!binary\s+/, "")
         if rest.start_with?("|")
           content = parse_block_scalar(indent, rest[1..].to_s.strip)
-          Scalar.new(value: content.unpack1("m"))
+          Scalar.new(content.unpack1("m"))
         else
-          Scalar.new(value: decode_binary_tag(val))
+          Scalar.new(decode_binary_tag(val))
         end
       end
 
       def parse_alias_ref
-        AliasRef.new(name: @lines.shift.lstrip[1..].strip)
+        AliasRef.new(@lines.shift.lstrip[1..].strip)
       end
 
       def parse_inline_alias(content)
-        AliasRef.new(name: content[1..].strip)
+        AliasRef.new(content[1..].strip)
       end
 
       def current_indent
-        line = @lines[0]
-        line.size - line.lstrip.size
+        indent_of(@lines[0])
+      end
+
+      def indent_of(line)
+        i = 0
+        i += 1 while LSTRIP_BYTES.include?(line.getbyte(i))
+        i
       end
 
       def consume_anchor
         line = @lines[0]
         stripped = line.lstrip
-        return nil unless stripped.start_with?("&") && stripped =~ /^&(\S+)\s+/
+        return nil unless stripped.start_with?("&") && stripped =~ /^&(\S+)\s*/
 
         anchor = $1
-        @lines[0] = line.sub(/&#{Regexp.escape(anchor)}\s+/, "")
+        if $'.empty?
+          @lines.shift
+        else
+          @lines[0] = line.sub(/&#{Regexp.escape(anchor)}\s+/, "")
+        end
         anchor
       end
 
-      def extract_item_anchor(content)
+      def extract_anchor(content)
         return [nil, content] unless content =~ /^&(\S+)/
 
         anchor = $1
         [anchor, content.sub(/^&#{Regexp.escape(anchor)}\s*/, "")]
       end
 
-      def consume_value_anchor(val)
-        return [nil, val] unless val =~ /^&(\S+)\s+/
-
-        anchor = $1
-        [anchor, val.sub(/^&#{Regexp.escape(anchor)}\s+/, "")]
-      end
-
       def register_anchor(name, node)
         if name
+          # An anchored empty node still defines the anchor, as a null.
+          node ||= Scalar.new(nil)
           @anchors[name] = node
           node.anchor = name if node.respond_to?(:anchor=)
         end
@@ -414,12 +490,7 @@ module Gem
       end
 
       def skip_blank_and_comments
-        while @lines.any?
-          line = @lines[0]
-          stripped = line.lstrip
-          break unless stripped.empty? || stripped.start_with?("#")
-          @lines.shift
-        end
+        @lines.shift while @lines.any? && BLANK_OR_COMMENT_RE.match?(@lines[0])
       end
 
       def strip_comment(val)
@@ -462,14 +533,16 @@ module Gem
     class Builder
       VALID_OPS = %w[= != > < >= <= ~>].freeze
       ARRAY_FIELDS = %w[files test_files executables extra_rdoc_files].freeze
-      MAX_ALIAS_RESOLUTIONS = 1_000
+      MAX_ALIAS_EXPANSION = 100_000
 
       def initialize(permitted_classes: [], permitted_symbols: [], aliases: true)
         @permitted_classes = permitted_classes.map {|c| "!ruby/object:#{c}" }
         @permitted_symbols = permitted_symbols
         @aliases = aliases
         @anchor_values = {}
-        @alias_count = 0
+        @anchor_sizes = {}
+        @expanded_size = 0
+        @alias_expansion = 0
       end
 
       def build(node)
@@ -487,31 +560,40 @@ module Gem
       private
 
       def build_node(node)
+        start = @expanded_size
         case node
         when nil then nil
         when AliasRef then resolve_alias(node)
-        when Scalar then store_anchor(node.anchor, node.value)
-        when Mapping then build_mapping(node)
-        when Sequence then store_anchor(node.anchor, node.items.map {|item| build_node(item) })
+        when Scalar then store_anchor(node.anchor, node.value, start)
+        when Mapping then store_anchor(node.anchor, build_mapping(node), start)
+        when Sequence then store_anchor(node.anchor, node.items.map {|item| build_node(item) }, start)
         else node # already a Ruby object
         end
       end
 
       def resolve_alias(node)
         raise Psych::AliasesNotEnabled unless @aliases
-        @alias_count += 1
-        if @alias_count > MAX_ALIAS_RESOLUTIONS
-          raise Psych::BadAlias, "exceeded maximum alias resolutions (#{MAX_ALIAS_RESOLUTIONS})"
-        end
         unless @anchor_values.key?(node.name)
-          klass = defined?(Psych::AnchorNotDefined) ? Psych::AnchorNotDefined : Psych::BadAlias
-          raise klass, "An alias referenced an unknown anchor: #{node.name}"
+          raise Psych::AnchorNotDefined, node.name if defined?(Psych::AnchorNotDefined)
+          raise Psych::BadAlias, "An alias referenced an unknown anchor: #{node.name}"
+        end
+        # Charge the expanded size of the anchor, weighing scalars by length,
+        # so neither nested aliases nor aliases to a long string blow up.
+        size = @anchor_sizes.fetch(node.name)
+        @expanded_size += size
+        @alias_expansion += size
+        if @alias_expansion > MAX_ALIAS_EXPANSION
+          raise Psych::BadAlias, "exceeded maximum alias expansion (#{MAX_ALIAS_EXPANSION})"
         end
         @anchor_values.fetch(node.name)
       end
 
-      def store_anchor(name, value)
-        @anchor_values[name] = value if name
+      def store_anchor(name, value, start)
+        @expanded_size += value.is_a?(String) ? 1 + value.bytesize : 1
+        if name
+          @anchor_values[name] = value
+          @anchor_sizes[name] = @expanded_size - start
+        end
         value
       end
 
@@ -537,13 +619,12 @@ module Gem
                    raise ArgumentError, "undefined class/module #{node.tag.sub("!ruby/object:", "")}"
         end
 
-        store_anchor(node.anchor, result)
+        result
       end
 
       def build_hash(node)
         result = {}
-        node.pairs.each do |key_node, value_node|
-          key = key_node.is_a?(Scalar) ? key_node.value.to_s : build_node(key_node).to_s
+        each_pair(node) do |key, value_node|
           value = build_node(value_node)
 
           if ARRAY_FIELDS.include?(key)
@@ -643,11 +724,19 @@ module Gem
 
       def pairs_to_hash(node)
         result = {}
-        node.pairs.each do |key_node, value_node|
-          key = key_node.is_a?(Scalar) ? key_node.value.to_s : build_node(key_node).to_s
+        each_pair(node) do |key, value_node|
           result[key] = build_node(value_node)
         end
         result
+      end
+
+      def each_pair(node)
+        pairs = node.pairs
+        i = 0
+        while i < pairs.size
+          yield pairs[i], pairs[i + 1]
+          i += 2
+        end
       end
 
       def validate_tag!(tag)
@@ -713,7 +802,9 @@ module Gem
       }.freeze
 
       def emit(obj)
-        "---#{emit_node(obj, 0)}"
+        res = "---#{emit_node(obj, 0)}"
+        res << "...\n" if @open_ended
+        res
       end
 
       private
@@ -831,13 +922,33 @@ module Gem
       end
 
       def emit_block_scalar(str, indent)
-        parts = [str.end_with?("\n") ? " |\n" : " |-\n"]
+        # The root node has no parent to be indented from, so indent its
+        # content by one level like libyaml does.
+        indent = 2 if indent.zero?
+        parts = [" |#{block_scalar_header(str)}\n"]
         str.each_line do |line|
-          parts << "#{pad(indent + 2)}#{line}"
+          parts << (line == "\n" ? line : "#{pad(indent)}#{line}")
         end
         res = parts.join
         res << "\n" unless res.end_with?("\n")
         res
+      end
+
+      # Mirrors libyaml: an explicit indentation indicator when the first
+      # line is empty or starts with a space (a parser would otherwise take
+      # that whitespace as the block indentation and drop it), "-" when the
+      # content does not end with a line break and "+" when it ends with
+      # more than one, which also requires a document end marker.
+      def block_scalar_header(str)
+        header = +""
+        header << "2" if str.start_with?(" ", "\n")
+        if !str.end_with?("\n")
+          header << "-"
+        elsif str.end_with?("\n\n") || str == "\n"
+          header << "+"
+          @open_ended = true
+        end
+        header
       end
 
       def needs_quoting?(str, quote = false)
@@ -864,17 +975,16 @@ module Gem
     end
 
     def load(str, permitted_classes: [], permitted_symbols: [], aliases: true)
-      raise TypeError, "no implicit conversion of nil into String" if str.nil?
-      return nil if str.empty?
-
       ast = Parser.new(str).parse
-      return nil if ast.nil?
-
-      Builder.new(
+      result = Builder.new(
         permitted_classes: permitted_classes,
         permitted_symbols: permitted_symbols,
         aliases: aliases
       ).build(ast)
+      # Bundler 4.0 and older call Hash methods on what this returns for
+      # .bundle/config, which is just "---" once its last key is unset, so
+      # nil stays a Hash here as it did in RubyGems 4.0.
+      result.nil? ? {} : result
     end
   end
 end

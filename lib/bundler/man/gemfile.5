@@ -82,7 +82,7 @@ ruby "2\.6\.8", engine: "jruby", engine_version: "9\.3\.8\.0"
 .fi
 .IP "" 0
 .SS "PATCHLEVEL"
-Each application \fImay\fR specify a Ruby patchlevel\. Specifying the patchlevel has been meaningless since Ruby 2\.1\.0 was released as the patchlevel is now uniquely determined by a combination of major, minor, and teeny version numbers\.
+Each application \fImay\fR specify a Ruby patchlevel\. The option is accepted for compatibility with existing Gemfiles and ignored: the patchlevel has been uniquely determined by the combination of major, minor, and teeny version numbers since Ruby 2\.1\.0 was released, so Bundler does not compare it against the patchlevel of the running Ruby\.
 .P
 This option was implemented in Bundler 1\.4\.0 for Ruby 2\.0 or earlier\.
 .IP "" 4
@@ -468,6 +468,8 @@ The \fBgemspec\fR method adds any runtime dependencies as gem requirements in th
 .P
 The \fBgemspec\fR method supports optional \fB:path\fR, \fB:glob\fR, \fB:name\fR, and \fB:development_group\fR options, which control where bundler looks for the \fB\.gemspec\fR, the glob it uses to look for the gemspec (defaults to: \fB{,*,*/*}\.gemspec\fR), what named \fB\.gemspec\fR it uses (if more than one is present), and which group development dependencies are included in\.
 .P
+When \fBgemspec\fR is called inside a \fBgroup\fR block, the gem requirement on your project goes into that group instead of the default group, and so do its runtime dependencies\. Development dependencies stay in the \fBdevelopment\fR group, or the group given by \fB:development_group\fR\. An enclosing \fBplatforms\fR or \fBinstall_if\fR block applies to the project and its development dependencies alike\.
+.P
 When a \fBgemspec\fR dependency encounters version conflicts during resolution, the local version under development will always be selected \-\- even if there are remote versions that better match other requirements for the \fBgemspec\fR gem\.
 .SH "EVAL_GEMFILE"
 A Gemfile \fBMAY\fR be split across multiple files\. The \fBeval_gemfile\fR method reads the contents of another file as if they appeared in the current Gemfile\. A relative path is resolved against the directory of the file containing the call\.
@@ -530,26 +532,26 @@ OVERRIDES
 .fi
 .IP "" 0
 .P
-Requirements are recorded in normalized form, so \fB">=8\.0"\fR and \fB">= 8\.0"\fR are the same override\. A frozen install fails when the Gemfile's overrides differ from the recorded ones\. Adding or removing a \fB:all\fR or metadata override rewrites the section without moving locked versions; run \fBbundle update\fR to re\-resolve under it\. When resolution still fails, Bundler appends the active overrides (with their Gemfile location) to the error message so it is clear which override shaped the constraint set\.
+Requirements are recorded in normalized form, so \fB">=8\.0"\fR and \fB">= 8\.0"\fR are the same override\. A frozen install fails when the Gemfile's overrides differ from the recorded ones\. Adding or removing a \fB:all\fR or metadata override rewrites the section and keeps the locked versions\. The exception is a locked gem that is not installed and whose metadata rejects the current Ruby\. Bundler re\-resolves it, as it does without the override\. Run \fBbundle update\fR to re\-resolve under the override\. When resolution still fails, Bundler appends the active overrides (with their Gemfile location) to the error message so it is clear which override shaped the constraint set\.
 .SS "DROPPING OR REPLACING A DEPENDENCY"
-\fBfrom:\fR and \fBto:\fR rewrite a single dependency of a single gem:
+\fBwith:\fR and \fBin:\fR rewrite a single dependency of a single gem:
 .IP "" 4
 .nf
-override <target>, from: <gem>, to: nil
-override <target>, from: <gem>, to: <replacement>, version: <requirement>
+override <target>, with: nil, in: <gem>
+override <target>, with: <replacement>, in: <gem>, version: <requirement>
 .fi
 .IP "" 0
 .P
-\fBto: nil\fR removes the dependency of \fB<gem>\fR on \fB<target>\fR, so \fB<target>\fR is not installed unless something else still requires it\. \fBto: <replacement>\fR makes \fB<gem>\fR depend on \fB<replacement>\fR instead of \fB<target>\fR\. The requirement \fB<gem>\fR put on \fB<target>\fR is discarded, and the optional \fBversion:\fR gives the replacement its own\. Both forms apply whether \fB<gem>\fR is a direct or a transitive dependency\.
+\fBwith: nil\fR removes the dependency of \fB<gem>\fR on \fB<target>\fR, so \fB<target>\fR is not installed unless something else still requires it\. \fBwith: <replacement>\fR makes \fB<gem>\fR depend on \fB<replacement>\fR instead of \fB<target>\fR\. The requirement \fB<gem>\fR put on \fB<target>\fR is discarded, and the optional \fBversion:\fR gives the replacement its own\. Both forms apply whether \fB<gem>\fR is a direct or a transitive dependency\.
 .P
-\fBfrom:\fR is required, and so is \fBto:\fR once \fBfrom:\fR is given\. To rewrite the same dependency of several gems, write one \fBoverride\fR per gem\. It is an error to declare the same \fB<target>\fR and \fBfrom:\fR twice, to drop a gem that the Gemfile requires directly, or to replace a gem that another gem still requires, since both would then be in the bundle\.
+\fBin:\fR is required, and so is \fBwith:\fR once \fBin:\fR is given\. To rewrite the same dependency of several gems, write one \fBoverride\fR per gem\. It is an error to declare the same \fB<target>\fR and \fBin:\fR twice, to drop a gem that the Gemfile requires directly, or to replace a gem that another gem still requires, since both would then be in the bundle\.
 .IP "" 4
 .nf
 # jekyll only loads em\-websocket for `jekyll serve \-\-livereload`\.
-override "em\-websocket", from: "jekyll", to: nil
+override "em\-websocket", with: nil, in: "jekyll"
 
 # Use an API\-compatible gem that provides the same files\.
-override "foo", from: "bar", to: "foo\-lite"
+override "foo", with: "foo\-lite", in: "bar"
 .fi
 .IP "" 0
 .P

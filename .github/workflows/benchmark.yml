@@ -1,0 +1,49 @@
+name: benchmark
+
+on:
+  schedule:
+    - cron: 17 3 * * *
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  benchmark:
+    name: Benchmark
+    runs-on: ubuntu-24.04
+    if: github.repository == 'ruby/rubygems'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup ruby
+        uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          ruby-version: 4.0.5
+          bundler: none
+      - name: Run benchmark
+        run: |
+          ruby tool/bench/run.rb --out results.json | tee table.txt
+          { echo '```'; cat table.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload results
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: results
+          path: results.json
+          retention-days: 90
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: logs
+          path: tmp/bench/*/*/log
+    timeout-minutes: 20

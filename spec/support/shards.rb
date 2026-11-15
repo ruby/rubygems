@@ -202,6 +202,7 @@ module Spec
         "spec/bundler/cli/open_spec.rb",
         "spec/commands/prune_spec.rb",
         "spec/install/gemfile/git_sparse_checkout_spec.rb",
+        "spec/install/gems/default_gems_spec.rb",
       ],
     }.freeze
   end

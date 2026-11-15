@@ -2,4 +2,4 @@
 check-filenames=
 check-hidden=
 ignore-words=.codespellignore
-skip=CODE_OF_CONDUCT.md,*.pem,.git,./tmp,./lib/bundler/templates/newgem/CODE_OF_CONDUCT.md.tt,man,vcr_cassettes,vendor,.venv
+skip=CODE_OF_CONDUCT.md,*.pem,.git,./tmp,./lib/bundler/templates/newgem/CODE_OF_CONDUCT.md.tt,man,vcr_cassettes,vendor,.venv,./tool/bench/scenarios,./tool/bench/index.txt
