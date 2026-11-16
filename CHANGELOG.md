@@ -106,6 +106,7 @@ Changes already released in 4.0.x are not repeated here.
 #### Bug fixes:
 
 * Fix Bundler mirror probing with `fallback_timeout`. Pull request [#10046](https://github.com/ruby/rubygems/pull/10046) by Hiroshi SHIBATA
+* Preload git sources that share a cache one after another. Pull request [#9951](https://github.com/ruby/rubygems/pull/9951) by Shai
 
 #### Breaking changes:
 
