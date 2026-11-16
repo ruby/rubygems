@@ -98,6 +98,25 @@ class ReleaseTest < Test::Unit::TestCase
     end
   end
 
+  def test_pull_requests_merged_into_bounds_the_listing_where_a_release_branch_diverged
+    in_a_repo_with_two_commits do |first, second|
+      git("checkout", "-b", "stable", first)
+      git("commit", "--allow-empty", "-m", "release")
+      tagged = `git rev-parse HEAD`.strip
+
+      since_ref = nil
+      listing = lambda do |_base, ref|
+        since_ref = ref
+        []
+      end
+      release.stub(:merged_pull_requests, listing) do
+        release.send(:pull_requests_merged_into, "master", tagged, second)
+      end
+
+      assert_equal first, since_ref
+    end
+  end
+
   def test_pull_requests_merged_into_fails_when_the_range_does_not_resolve
     error = assert_raise(RuntimeError) do
       release.send(:pull_requests_merged_into, "master", "no-such-ref-for-a-test", "HEAD")
