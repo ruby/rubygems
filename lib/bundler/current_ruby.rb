@@ -34,7 +34,7 @@ module Bundler
     def ruby?
       return true if Bundler::MatchPlatform.generic_local_platform_is_ruby?
 
-      !windows? && (RUBY_ENGINE == "ruby" || RUBY_ENGINE == "rbx" || RUBY_ENGINE == "maglev" || RUBY_ENGINE == "truffleruby")
+      !windows? && (RUBY_ENGINE == "ruby" || RUBY_ENGINE == "rbx" || RUBY_ENGINE == "maglev" || RUBY_ENGINE == "truffleruby" || RUBY_ENGINE == "spinel")
     end
 
     def mri?

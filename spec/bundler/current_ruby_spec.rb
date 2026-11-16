@@ -145,6 +145,28 @@ RSpec.describe Bundler::CurrentRuby do
     end
   end
 
+  describe "#ruby?" do
+    subject { described_class.new }
+
+    before do
+      allow(Gem).to receive(:win_platform?).and_return(false)
+      allow(Bundler::MatchPlatform).to receive(:generic_local_platform_is_ruby?).and_return(false)
+    end
+
+    it "is true on Spinel" do
+      stub_const("RUBY_ENGINE", "spinel")
+
+      expect(subject.ruby?).to be(true)
+      expect(subject.mri?).to be(false)
+    end
+
+    it "is false on an unknown engine" do
+      stub_const("RUBY_ENGINE", "unknown")
+
+      expect(subject.ruby?).to be(false)
+    end
+  end
+
   describe "Deprecated platform" do
     it "outputs an error and aborts when calling maglev?" do
       expect { Bundler.current_ruby.maglev? }.to raise_error(Bundler::RemovedError, /`CurrentRuby#maglev\?` was removed with no replacement./)
