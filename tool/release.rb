@@ -388,6 +388,8 @@ class Release
       prerelease: @prerelease,
     }
     options[:target_commitish] = @stable_branch unless @prerelease
+    # 4.1 is the latest line now, so a 4.0.x release must not take over Latest on GitHub.
+    options[:make_latest] = "false"
 
     release = gh_client.create_release "ruby/rubygems", tag, **options
 
