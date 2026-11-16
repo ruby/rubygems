@@ -1,7 +1,7 @@
 name: Sync ruby
 on:
   push:
-    branches: [master]
+    branches: ["4.1"]
 permissions:
   contents: read
 
@@ -9,7 +9,7 @@ jobs:
   sync:
     name: Sync ruby
     runs-on: ubuntu-latest
-    if: ${{ github.repository_owner == 'ruby' }}
+    if: ${{ github.repository_owner == 'ruby' && !github.event.created }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
