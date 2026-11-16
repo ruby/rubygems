@@ -170,7 +170,12 @@ module Bundler
           data = index_f.read
 
           require_relative "../yaml_serializer"
-          index = YAMLSerializer.load(data)
+          loaded = YAMLSerializer.load(data)
+          # Bundler 4.1 writes empty sections as "{}", which this serializer
+          # reads as a string.
+          index = %w[commands hooks load_paths plugin_paths sources].to_h do |key|
+            [key, loaded[key].is_a?(Hash) ? loaded[key] : {}]
+          end
 
           @commands.merge!(index["commands"])
           @hooks.merge!(index["hooks"])
