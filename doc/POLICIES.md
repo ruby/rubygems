@@ -47,11 +47,11 @@ We also support the latest stable versions of JRuby and TruffleRuby, and constan
 
 ### Version Support and Releases
 
-The team ships features and bugfixes for the latest minor version. We may exceptionally backport security fixes to older series shipped with Rubies that are officially supported.
+The team ships features and bugfixes for the latest minor version. From 4.0 on, older minor series also get bug fixes, documentation fixes and security fixes backported from the main branch.
 
 Security releases will be made for RubyGems and Bundler versions that were included in a currently-supported Ruby release. For example, if a version was shipped with a Ruby release, it will receive security fixes until that Ruby version reaches end-of-life.
 
-We generally release bugfixes from the main branch and may mix bug fixes and new features in the same release. We do not guarantee bugfix releases for previous minor or major versions.
+We generally release bugfixes from the main branch. Releases of the latest minor version may mix bug fixes and new features, while older series get only the fixes above.
 
 These policies are not a guarantee that any particular fix will be backported. Instead, this is a way for us to set an upper limit on the versions of Ruby, RubyGems, and Bundler that we have to consider while making changes. Without the limit, the number of versions grows exponentially over time and quickly becomes overwhelming, which leads to maintainer burnout. We want to avoid that.
 
