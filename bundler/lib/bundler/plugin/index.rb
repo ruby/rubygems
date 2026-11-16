@@ -163,6 +163,8 @@ module Bundler
       # @param [Pathname] index file path
       # @param [Boolean] is the index file global index
       def load_index(index_file, global = false)
+        base = global ? Plugin.global_root : Plugin.root
+
         SharedHelpers.filesystem_access(index_file, :read) do |index_f|
           valid_file = index_f&.exist? && !index_f.size.zero?
           break unless valid_file
@@ -179,10 +181,29 @@ module Bundler
 
           @commands.merge!(index["commands"])
           @hooks.merge!(index["hooks"])
-          @load_paths.merge!(index["load_paths"])
-          @plugin_paths.merge!(index["plugin_paths"])
+          @load_paths.merge!(absolutize_paths(index["load_paths"], base))
+          @plugin_paths.merge!(absolutize_paths(index["plugin_paths"], base))
           @sources.merge!(index["sources"]) unless global
         end
+      end
+
+      # Bundler 4.1 records the paths of a plugin installed in the plugin root
+      # relative to it.
+      def absolutize_paths(paths, base)
+        paths.transform_values do |value|
+          if value.is_a?(Array)
+            value.map {|path| absolutize_path(path, base) }
+          else
+            absolutize_path(value, base)
+          end
+        end
+      end
+
+      def absolutize_path(path, base)
+        pathname = Pathname.new(path)
+        return path if pathname.absolute?
+
+        Pathname.new(base).join(pathname).to_s
       end
 
       # Should be called when any of the instance variables change. Stores the
