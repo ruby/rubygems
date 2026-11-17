@@ -111,9 +111,11 @@ engine version specified _must_ match the Ruby version.
 
 ### PATCHLEVEL
 
-Each application _may_ specify a Ruby patchlevel. Specifying the patchlevel has
-been meaningless since Ruby 2.1.0 was released as the patchlevel is now
-uniquely determined by a combination of major, minor, and teeny version numbers.
+Each application _may_ specify a Ruby patchlevel. The option is accepted for
+compatibility with existing Gemfiles and ignored: the patchlevel has been
+uniquely determined by the combination of major, minor, and teeny version
+numbers since Ruby 2.1.0 was released, so Bundler does not compare it against
+the patchlevel of the running Ruby.
 
 This option was implemented in Bundler 1.4.0 for Ruby 2.0 or earlier.
 
@@ -559,6 +561,12 @@ The `gemspec` method supports optional `:path`, `:glob`, `:name`, and `:developm
 options, which control where bundler looks for the `.gemspec`, the glob it uses to look
 for the gemspec (defaults to: `{,*,*/*}.gemspec`), what named `.gemspec` it uses
 (if more than one is present), and which group development dependencies are included in.
+
+When `gemspec` is called inside a `group` block, the gem requirement on your
+project goes into that group instead of the default group, and so do its runtime
+dependencies. Development dependencies stay in the `development` group, or the
+group given by `:development_group`. An enclosing `platforms` or `install_if`
+block applies to the project and its development dependencies alike.
 
 When a `gemspec` dependency encounters version conflicts during resolution, the
 local version under development will always be selected -- even if there are
