@@ -222,6 +222,34 @@ class TestGemSafeYAML < Gem::TestCase
     assert_equal Psych.safe_load(input), Gem::YAMLSerializer.load(input)
   end
 
+  def test_document_start_marker_forms
+    assert_equal({ "a" => 1 }, yaml_load("---\na: 1\n--- # second\nb: 2\n"))
+    assert_equal({ "a" => 1 }, yaml_load("a: 1\n---\tb: 2\n"))
+    assert_equal({ "a" => 1 }, yaml_load("a: 1\r\n---\r\nb: 2\r\n"))
+    assert_equal({ "a" => 1 }, yaml_load("a: 1\n--- b: 2\n"))
+    assert_equal({}, yaml_load("--- {}\n---\na: 1\n"))
+    assert_nil Gem::SafeYAML.safe_load("---\n---\na: 1\n")
+    assert_equal({ "a" => 1, "---x" => 2 }, yaml_load("a: 1\n---x: 2\n"))
+  end
+
+  def test_later_specification_documents_are_ignored
+    yaml = <<~YAML
+      --- !ruby/object:Gem::Specification
+      name: first
+      version: !ruby/object:Gem::Version
+        version: 1.0.0
+      extensions: []
+      --- !ruby/object:Gem::Specification
+      name: second
+      extensions:
+      - ext/extconf.rb
+    YAML
+
+    spec = Gem::SafeYAML.safe_load(yaml)
+    assert_equal "first", spec.name
+    assert_equal [], spec.extensions
+  end
+
   def test_unused_anchor_with_aliases_disabled_is_allowed
     aliases_enabled = Gem::SafeYAML.aliases_enabled?
     Gem::SafeYAML.aliases_enabled = false
