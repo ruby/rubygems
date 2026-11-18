@@ -39,9 +39,18 @@ module Bundler
       raise GemfileNotFound, "#{gemfile} not found" unless gemfile.file?
 
       Plugin.hook(Plugin::Events::GEM_BEFORE_EVAL, gemfile, lockfile)
-      Dsl.evaluate(gemfile, lockfile, unlock).tap do |definition|
-        Plugin.hook(Plugin::Events::GEM_AFTER_EVAL, definition)
+      definition = Dsl.evaluate(gemfile, lockfile, unlock.dup)
+
+      # A checkout without a plugin index has the plugin gems but does not load
+      # them. Evaluate again once they are registered, so their hooks and DSL
+      # methods apply to this Gemfile.
+      if Plugin.register_installed_plugins(definition.dependencies, gemfile, definition.lockfile)
+        Plugin.hook(Plugin::Events::GEM_BEFORE_EVAL, gemfile, lockfile)
+        definition = Dsl.evaluate(gemfile, lockfile, unlock)
       end
+
+      Plugin.hook(Plugin::Events::GEM_AFTER_EVAL, definition)
+      definition
     end
 
     #

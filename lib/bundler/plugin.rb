@@ -150,6 +150,36 @@ module Bundler
       @gemfile_parse = false
     end
 
+    # Registers the plugins in +dependencies+ that the index lacks, when their
+    # locked gems are already installed, as in a fresh checkout of an image
+    # whose gems were installed at build time. Nothing is fetched or installed.
+    #
+    # @param [Array<Dependency>] dependencies from the evaluated Gemfile
+    # @param [Pathname] gemfile path
+    # @param [Pathname] lockfile path
+    # @return [Boolean] whether any plugin was registered
+    def register_installed_plugins(dependencies, gemfile, lockfile)
+      return false unless Bundler.settings[:plugins]
+
+      names = dependencies.select(&:plugin?).map(&:name).reject {|name| index.installed?(name) }
+      return false if names.empty?
+
+      @gemfile_parse = true
+      builder = DSL.new
+      builder.eval_gemfile(gemfile)
+      definition = builder.to_definition(lockfile, {})
+      return false if definition.missing_specs?
+
+      specs = definition.specs.each_with_object({}) {|spec, hash| hash[spec.name] = spec }
+      save_plugins specs.slice(*names), builder.inferred_plugins
+      names.any? {|name| index.installed?(name) }
+    rescue BundlerError => e
+      Bundler.ui.debug "Could not register the installed plugins #{names&.join(", ")}: #{e.message}"
+      false
+    ensure
+      @gemfile_parse = false
+    end
+
     # The index object used to store the details about the plugin
     def index
       @index ||= Index.new
