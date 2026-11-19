@@ -9,7 +9,7 @@ class TestGemCoreExtTCPSocketInit < Gem::TestCase
   end
 
   def test_initialize_forwards_socket_arguments
-    assert_separately [], <<~RUBY
+    assert_separately [], <<~RUBY, ignore_stderr: true
       require "rubygems/core_ext/tcpsocket_init"
       require "stringio"
 
