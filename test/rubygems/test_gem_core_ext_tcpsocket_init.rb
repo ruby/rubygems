@@ -9,6 +9,8 @@ class TestGemCoreExtTCPSocketInit < Gem::TestCase
   end
 
   def test_initialize_forwards_socket_arguments
+    omit "assert_separately cannot run a child process on JRuby for Windows" if RUBY_ENGINE == "jruby" && Gem.win_platform?
+
     assert_separately [], <<~RUBY, ignore_stderr: true
       require "rubygems/core_ext/tcpsocket_init"
       require "stringio"
