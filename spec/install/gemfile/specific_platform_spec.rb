@@ -975,6 +975,77 @@ RSpec.describe "bundle install with specific platforms" do
     L
   end
 
+  it "keeps a ruby fallback variant dependency in its locked source when resolving locally after a Gemfile change" do
+    build_repo3 do
+      build_gem "scoped_gem", "1.0"
+    end
+
+    build_repo4 do
+      build_gem "native_tool", "1.0" do |s|
+        s.add_dependency "rake"
+      end
+
+      build_gem "native_tool", "1.0" do |s|
+        s.platform = "x86_64-linux"
+      end
+
+      build_gem "rake"
+      build_gem "other", "1.0"
+    end
+
+    # the ruby variant is installed too, so a local resolution picks it up
+    system_gems "native_tool-1.0", "native_tool-1.0-x86_64-linux", "rake-1.0", "other-1.0", gem_repo: gem_repo4, path: default_bundle_path
+    system_gems "scoped_gem-1.0", gem_repo: gem_repo3, path: default_bundle_path
+
+    gemfile <<~G
+      source "https://gem.repo4"
+
+      source "https://gem.repo3" do
+        gem "scoped_gem"
+      end
+
+      gem "native_tool"
+      gem "other"
+    G
+
+    lockfile <<~L
+      GEM
+        remote: https://gem.repo3/
+        specs:
+          scoped_gem (1.0)
+
+      GEM
+        remote: https://gem.repo4/
+        specs:
+          native_tool (1.0)
+            rake
+          native_tool (1.0-x86_64-linux)
+          rake (1.0)
+
+      PLATFORMS
+        x86_64-linux
+
+      DEPENDENCIES
+        native_tool
+        scoped_gem!
+
+      BUNDLED WITH
+        #{Bundler::VERSION}
+    L
+
+    simulate_platform "x86_64-linux" do
+      bundle "install --local"
+    end
+
+    expect(lockfile).to include(<<~L)
+      GEM
+        remote: https://gem.repo3/
+        specs:
+          scoped_gem (1.0)
+
+    L
+  end
+
   it "automatically fixes the lockfile if only ruby platform is locked and some gem has no ruby variant available" do
     build_repo4 do
       build_gem("sorbet-static-and-runtime", "0.5.10160") do |s|
