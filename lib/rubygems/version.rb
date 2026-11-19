@@ -425,7 +425,7 @@ class Gem::Version
       # may leave a trailing dot which will be ignored by partition_segments
       canonical_version = @version.sub(/(?<=[a-zA-Z.])[.0]+\z/, "")
       # remove 0 segments before the first letter in a prerelease version
-      canonical_version.sub!(/(?<=\.|\A)[0.]+(?=[a-zA-Z])/, "") if prerelease?
+      canonical_version.sub!(/\A([^a-zA-Z]*?)(?<=\A|\.)[0.]+(?=[a-zA-Z])/, '\1') if prerelease?
       partition_segments(canonical_version)
     end
   end

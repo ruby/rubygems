@@ -257,6 +257,22 @@ class TestGemVersion < Gem::TestCase
     assert_equal [1], v("1.0.0").canonical_segments
     assert_equal [1, "a", 1], v("1.0.0.a.1.0").canonical_segments
     assert_equal [1, 2, 3, "pre", 1], v("1.2.3-1").canonical_segments
+    assert_equal [1, "a", 0, "b"], v("1.a.0.b").canonical_segments
+    assert_equal [1, "rc", 0, "b"], v("1.rc.0.b").canonical_segments
+    assert_equal [1, 2, 3, "pre", "alpha", 0, "dev"], v("1.2.3-alpha.0.dev").canonical_segments
+    assert_equal [10, "a"], v("10.a").canonical_segments
+
+  end
+
+  def test_prerelease_zero_segment_is_significant
+    refute_equal v("1.a.0.b"), v("1.a.b")
+    assert_equal 1, v("1.a.0.b") <=> v("1.a.b")
+    refute_equal v("1.2.3-alpha.0.dev"), v("1.2.3-alpha.dev")
+
+    assert_equal v("1.2-alpha.0.dev"), v("1.2.0-alpha.0.dev")
+    assert_equal v("1.rc0.b"), v("1.rc.0.b")
+
+    refute Gem::Requirement.new("= 1.a.b").satisfied_by?(v("1.a.0.b"))
   end
 
   def test_frozen_version
