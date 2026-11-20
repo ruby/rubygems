@@ -22,7 +22,9 @@ RSpec.describe "Bundler.setup" do
   end
 
   shared_examples "a gem activation conflict" do |default_gem, fallback|
-    let(:env) { { "BUNDLER_GEM_DEFAULT_DIR" => system_gem_path.to_s } }
+    let(:ruby_options) do
+      { env: { "BUNDLER_GEM_DEFAULT_DIR" => system_gem_path.to_s }, load_path: [lib_dir], raise_on_error: false }
+    end
 
     before do
       system_gems "myrack-1.0.0", "myrack_middleware-1.0"
@@ -35,7 +37,7 @@ RSpec.describe "Bundler.setup" do
     end
 
     it "points to the require that activated the gem while evaluating the Gemfile" do
-      ruby 'require "bundler/setup"', env: env, raise_on_error: false
+      ruby 'require "bundler/setup"', ruby_options
 
       expect(last_command).to be_failure
       expect(err).to include("You have already activated myrack 0.9.1, but your Gemfile requires myrack 1.0.0. " \
@@ -44,7 +46,7 @@ RSpec.describe "Bundler.setup" do
     end
 
     it "keeps the original advice when the gem was already active before evaluating the Gemfile" do
-      ruby <<~RUBY, env: env, raise_on_error: false
+      ruby <<~RUBY, ruby_options
         require "myrack_middleware"
         require "bundler/setup"
       RUBY
@@ -61,7 +63,7 @@ RSpec.describe "Bundler.setup" do
         gem "myrack", "1.0.0"
       G
 
-      ruby <<~RUBY, env: env, raise_on_error: false
+      ruby <<~RUBY, ruby_options
         START_WORKER = Queue.new
         WORKER = Thread.new do
           START_WORKER.pop
