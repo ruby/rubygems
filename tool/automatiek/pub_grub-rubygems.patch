@@ -67,3 +67,15 @@ diff --git a/lib/rubygems/vendor/pub_grub/lib/pub_grub/strategy.rb b/lib/rubygem
      end
 
      def next_term_to_try_from(unsatisfied)
+diff --git a/lib/rubygems/vendor/pub_grub/lib/pub_grub/term.rb b/lib/rubygems/vendor/pub_grub/lib/pub_grub/term.rb
+--- a/lib/rubygems/vendor/pub_grub/lib/pub_grub/term.rb
++++ b/lib/rubygems/vendor/pub_grub/lib/pub_grub/term.rb
+@@ -95,7 +95,7 @@ def negative?
+     end
+
+     def empty?
+-      @empty ||= normalized_constraint.empty?
++      constraint.empty?
+     end
+
+     def inspect
