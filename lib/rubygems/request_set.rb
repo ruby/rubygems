@@ -356,7 +356,16 @@ class Gem::RequestSet
     Bundler::Plugin.instance_variable_set(:@gemfile_parse, true)
     gemfile_parse_swapped = true
 
-    parser = Bundler::LockfileParser.new(File.read(lock_file), lockfile_path: lock_file)
+    # RubyGems can be upgraded independently of Bundler, so the Bundler that
+    # is loaded here may predate the `lockfile_path:` keyword (Bundler 4.1).
+    # Leave it out for such a Bundler: its parse errors then name
+    # Gemfile.lock instead of this lockfile, but a valid lockfile still loads.
+    parser_options = {}
+    if Bundler::LockfileParser.instance_method(:initialize).parameters.include?([:key, :lockfile_path])
+      parser_options[:lockfile_path] = lock_file
+    end
+
+    parser = Bundler::LockfileParser.new(File.read(lock_file), **parser_options)
 
     locked_versions = {}
 
