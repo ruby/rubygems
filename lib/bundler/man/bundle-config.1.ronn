@@ -146,7 +146,7 @@ learn more about their operation in [bundle install(1)](bundle-install.1.html).
    layers, highest precedence first:
 
      1. CLI flag `--cooldown N` on `install`, `update`, `add`, `cache`,
-        `lock`, and `outdated`.
+        `lock`, `outdated`, and `doctor cooldown`.
      2. This setting (`bundle config set cooldown N` or
         `BUNDLE_COOLDOWN=N`).
      3. The per-source `cooldown:` keyword in the Gemfile, such as
@@ -199,6 +199,11 @@ learn more about their operation in [bundle install(1)](bundle-install.1.html).
    offset. `rubygems.org` always sends one, but a third-party server
    that omits it would otherwise shift the cooldown window by the
    offset of whatever machine runs bundler.
+
+   Versions already in the lockfile are never excluded, so a cooldown
+   never breaks a working lockfile. To check that no locked version is
+   inside the cooldown window, for example in CI, run
+   `bundle doctor cooldown`. See bundle-doctor(1).
 * `credential_store` (`BUNDLE_CREDENTIAL_STORE`):
    Experimental: store and read host credentials (the values otherwise set
    via `bundle config set <host> <user:pass>`) in a credential store instead

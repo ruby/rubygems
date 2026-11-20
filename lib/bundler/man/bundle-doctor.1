@@ -8,9 +8,11 @@
 .br
 \fBbundle doctor ssl\fR [\-\-host=HOST] [\-\-tls\-version=TLS\-VERSION] [\-\-verify\-mode=VERIFY\-MODE]
 .br
+\fBbundle doctor cooldown\fR [\-\-cooldown=NUMBER]
+.br
 \fBbundle doctor\fR help [COMMAND]
 .SH "DESCRIPTION"
-You can diagnose common Bundler problems with this command such as checking gem environment or SSL/TLS issue\.
+You can diagnose common Bundler problems with this command such as checking gem environment, SSL/TLS issue, or locked gems that are too new for the cooldown setting\.
 .SH "SUB\-COMMANDS"
 .SS "diagnose (default command)"
 Checks your Gemfile and gem environment for common problems\. If issues are detected, Bundler prints them and exits status 1\. Otherwise, Bundler prints a success message and exits status 0\.
@@ -66,4 +68,21 @@ Accepted values are: \fB1\.1\fR or \fB1\.2\fR\.
 Specify the TLS verify mode when opening the connection to HOST\. Defaults to \fBSSL_VERIFY_PEER\fR\.
 .IP
 Accepted values are: \fBCLIENT_ONCE\fR, \fBFAIL_IF_NO_PEER_CERT\fR, \fBNONE\fR, \fBPEER\fR\.
+.SS "cooldown"
+Checks the gems locked in the lockfile against the cooldown setting\. The cooldown setting only applies when Bundler resolves a new version, and a version already in the lockfile is never excluded\. A version that is too new can still get into the lockfile, for example from a machine with no cooldown configured or from an update made with \fB\-\-cooldown 0\fR\. Run this command in CI to catch it\.
+.P
+Bundler fetches the publish time of each locked gem from its gem server\. It then compares the publish time with the cooldown that applies to the source of the gem\. If some locked gems are inside the cooldown window, Bundler prints them with the number of days left and exits status 1\. Otherwise, Bundler prints a success message and exits status 0\.
+.P
+The check reads the lockfile as written, the same way a frozen install does\. It does not resolve the Gemfile again, and it never changes the lockfile\.
+.P
+A locked version counts as inside the window when any published build of that version is inside the window\. This includes builds for platforms that are not in the lockfile\. The resolver applies the same rule when it excludes a version\.
+.P
+Gems from git and path sources have no publish time, so the check skips them\. When the gem server does not give a publish time for a locked gem, Bundler prints a warning that names the gem\. That gem does not make the check fail\. See \fBcooldown\fR in bundle\-config(1) for the gem servers that give publish times\.
+.P
+When no cooldown applies to the sources of the locked gems, Bundler says so and exits status 0 without a fetch from the gem servers\.
+.P
+\fBOPTIONS\fR
+.TP
+\fB\-\-cooldown=<number>\fR
+Check against a cooldown of \fInumber\fR days instead of the configured one\. Pass \fB0\fR to disable the check for this run\. See \fBcooldown\fR in bundle\-config(1) for the precedence between the CLI flag, Bundler config, Gemfile per\-source settings, and the gemrc file\.
 
