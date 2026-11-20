@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 # Reuse RubyGems' vendored URI (Gem::URI). The Bundler gem ships a copy under
-# lib/rubygems/vendor without its entry file (see
+# lib/rubygems/vendor without its entry file, which Bundler 2.5.6 to 4.0.x
+# require by name on RubyGems older than 3.5.6 (see
 # lib/rubygems/yaml_serializer/core.rb), so this loads the files that entry file
 # loads on RubyGems versions that predate it. Fall back to the stdlib only when
 # no vendored copy is available at all.
