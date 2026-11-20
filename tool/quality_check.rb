@@ -151,7 +151,7 @@ class QualityCheck
     entry_path = File.join(@source_root, "lib", "rubygems", "vendor", "uri", "lib", "uri.rb")
     loader_path = File.join(@source_root, "lib", "bundler", "vendored_uri.rb")
 
-    entry_files = File.read(entry_path).scan(%r{^require_relative ['"]uri/(\w+)['"]}).flatten
+    entry_files = File.read(entry_path).scan(/^require_relative ['"]([^'"]+)['"]/).flatten.map { _1.delete_prefix("uri/") }
     loader_files = File.read(loader_path)[/%w\[([^\]]*)\]\.each/, 1]&.split
 
     return if entry_files == loader_files
