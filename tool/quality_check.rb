@@ -23,6 +23,7 @@ class QualityCheck
     check_lib_language_quality
     check_documented_settings
     check_vendored_net_http_sync
+    check_vendored_uri_entry_sync
     check_gem_build
     check_shipped_files
 
@@ -144,6 +145,17 @@ class QualityCheck
 
     return if File.read(lib_implementation_path) == File.read(spec_implementation_path)
     @errors << "#{spec_implementation_path} is out of sync with #{lib_implementation_path}"
+  end
+
+  def check_vendored_uri_entry_sync
+    entry_path = File.join(@source_root, "lib", "rubygems", "vendor", "uri", "lib", "uri.rb")
+    loader_path = File.join(@source_root, "lib", "bundler", "vendored_uri.rb")
+
+    entry_files = File.read(entry_path).scan(%r{^require_relative ['"]uri/(\w+)['"]}).flatten
+    loader_files = File.read(loader_path)[/%w\[([^\]]*)\]\.each/, 1]&.split
+
+    return if entry_files == loader_files
+    @errors << "#{loader_path} loads #{loader_files.inspect}, but #{entry_path} loads #{entry_files.inspect}"
   end
 
   def check_gem_build
