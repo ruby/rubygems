@@ -633,6 +633,59 @@ RSpec.describe "bundler plugin install" do
         expect(the_bundle).to include_gems("foo 1.0.0")
       end
     end
+
+    context "when the plugin index is missing" do
+      before do
+        update_repo2 do
+          build_plugin "eval-hook-plugin" do |s|
+            s.write "plugins.rb", <<-RUBY
+              Bundler::Plugin::API.hook Bundler::Plugin::Events::GEM_BEFORE_EVAL do |_gemfile, _lockfile|
+                puts "eval-hook-plugin loaded"
+              end
+            RUBY
+          end
+        end
+
+        install_gemfile <<-G
+          source 'https://gem.repo2'
+          plugin 'eval-hook-plugin'
+          gem 'myrack', "1.0.0"
+        G
+
+        FileUtils.rm_rf(bundled_app(".bundle/plugin"))
+      end
+
+      it "registers a locked plugin that is already installed" do
+        bundle "check"
+
+        expect(out).to include("eval-hook-plugin loaded")
+        plugin_should_be_installed("eval-hook-plugin")
+      end
+
+      it "does not install a locked plugin that is missing" do
+        FileUtils.rm_rf(default_bundle_path("gems", "eval-hook-plugin-1.0"))
+        FileUtils.rm_rf(default_bundle_path("specifications", "eval-hook-plugin-1.0.gemspec"))
+
+        bundle "check", raise_on_error: false
+
+        expect(out).not_to include("eval-hook-plugin loaded")
+        expect(bundled_app(".bundle/plugin/index")).not_to exist
+      end
+
+      it "evaluates a Gemfile guarded by the plugin again once it is registered" do
+        install_gemfile <<-G
+          source 'https://gem.repo2'
+          plugin 'eval-hook-plugin'
+          return unless Plugin.loaded?('eval-hook-plugin')
+          gem 'myrack', "1.0.0"
+        G
+        FileUtils.rm_rf(bundled_app(".bundle/plugin"))
+
+        bundle "check"
+
+        expect(lockfile).to include("myrack (1.0.0)")
+      end
+    end
   end
 
   context "inline gemfiles" do
