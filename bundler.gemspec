@@ -46,7 +46,7 @@ Gem::Specification.new do |s|
   s.files += Dir.glob("lib/rubygems/vendor/uri/**/*", File::FNM_DOTMATCH).reject {|f| File.directory?(f) }
   s.files += Dir.glob("lib/rubygems/vendor/securerandom/**/*", File::FNM_DOTMATCH).reject {|f| File.directory?(f) }
   s.files += Dir.glob("lib/rubygems/vendor/pub_grub/**/*", File::FNM_DOTMATCH).reject {|f| File.directory?(f) }
-  s.files += Dir.glob("lib/rubygems/yaml_serializer.rb")
+  s.files += Dir.glob("lib/rubygems/yaml_serializer{.rb,/**/*}", File::FNM_DOTMATCH).reject {|f| File.directory?(f) }
   s.files += Dir.glob("lib/rubygems/cooldown_settings.rb")
   s.files += Dir.glob("lib/rubygems/compact_index_client{.rb,/**/*}", File::FNM_DOTMATCH).reject {|f| File.directory?(f) }
   s.files += Dir.glob("lib/rubygems/credential_store{.rb,/**/*}", File::FNM_DOTMATCH).reject {|f| File.directory?(f) }
