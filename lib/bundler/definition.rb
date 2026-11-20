@@ -879,7 +879,7 @@ module Bundler
         incomplete_specs = result.incomplete_specs_for_platform(dependencies, platform)
 
         if incomplete_specs.any?
-          resolver.raise_incomplete! incomplete_specs
+          resolver.raise_incomplete! incomplete_specs, platform
         end
       end
 

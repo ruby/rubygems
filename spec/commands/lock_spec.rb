@@ -1636,6 +1636,29 @@ RSpec.describe "bundle lock" do
     expect(err).to include(nice_error)
   end
 
+  it "reports the added platform when a transitive dependency is missing for it" do
+    build_repo4 do
+      build_gem("sorbet") {|s| s.add_dependency "sorbet-static" }
+      build_gem("sorbet-static") {|s| s.platform = "x86_64-linux" }
+    end
+
+    gemfile <<~G
+      source "https://gem.repo4"
+
+      gem "sorbet", platforms: :ruby
+    G
+
+    simulate_platform "universal-java" do
+      bundle "lock --add-platform x86_64-linux"
+
+      expect do
+        bundle "lock --add-platform arm64-darwin", raise_on_error: false
+      end.not_to change { lockfile }
+    end
+
+    expect(err).to include("Could not find gem 'sorbet-static (= 1.0)' with platform 'arm64-darwin'")
+  end
+
   it "reports all target platforms when no version covers them together" do
     build_repo4 do
       build_gem("sorbet-static") {|s| s.platform = "x86_64-linux" }
