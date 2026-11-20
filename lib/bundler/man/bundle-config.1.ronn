@@ -122,6 +122,19 @@ learn more about their operation in [bundle install(1)](bundle-install.1.html).
    `rails` executable, `bundle binstubs` will create a `bin/rails` executable
    that ensures that all referred dependencies will be resolved using the
    bundled gems.
+* `build_path_extensions` (`BUNDLE_BUILD_PATH_EXTENSIONS`):
+   Whether Bundler should build the native extensions of gems sourced from a
+   local path. Off by default, since building them means compiling code out of
+   a directory Bundler does not own. It can also be set for a single gem, as
+   `build_path_extensions.<gem>` (`BUNDLE_BUILD_PATH_EXTENSIONS__<GEM>`), which
+   takes precedence over the global setting.
+
+   Extensions are built out of tree: the gem is copied into a directory under
+   `BUNDLE_PATH` and compiled there, so that nothing is ever written into your
+   checkout, and the build directory is put ahead of the gem's own `lib` on the
+   load path. A rebuild happens whenever the size or modification time of any
+   file under an extension's directory changes, or when the flags configured
+   through `build.<gem>` change. Run `bundle pristine <gem>` to force one.
 * `cache_all` (`BUNDLE_CACHE_ALL`):
    Cache all gems, including path and git gems. This needs to be explicitly
    before bundler 4, but will be the default on bundler 4.
