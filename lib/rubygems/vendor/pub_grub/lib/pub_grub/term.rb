@@ -95,7 +95,7 @@ module Gem::PubGrub
     end
 
     def empty?
-      constraint.empty?
+      @empty ||= constraint.empty?
     end
 
     def inspect

@@ -75,7 +75,7 @@ diff --git a/lib/rubygems/vendor/pub_grub/lib/pub_grub/term.rb b/lib/rubygems/ve
 
      def empty?
 -      @empty ||= normalized_constraint.empty?
-+      constraint.empty?
++      @empty ||= constraint.empty?
      end
 
      def inspect
