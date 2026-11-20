@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "vendored_thor"
 require_relative "worker"
 require_relative "installer/parallel_installer"
 require_relative "installer/standalone"
