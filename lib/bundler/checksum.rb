@@ -36,6 +36,10 @@ module Bundler
 
       def from_lock(lock_checksum, lockfile_location)
         algo, digest = lock_checksum.strip.split(ALGO_SEPARATOR, 2)
+        unless algo&.match?(/\A[a-z0-9]+\z/i) && digest&.match?(%r{\A[-0-9a-z_+/]+={0,2}\z}i)
+          raise ArgumentError, "#{lock_checksum.inspect} is not a valid checksum"
+        end
+
         Checksum.new(algo, to_hexdigest(digest, algo), Source.new(:lock, lockfile_location))
       end
 
