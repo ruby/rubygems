@@ -213,10 +213,17 @@ class Gem::Version
   @@bump = {}
   @@release = {}
 
+  # Only the main Ractor can read the caches above, which are class variables.
+  # Other Ractors get this error and work without the caches.
+  CACHE_ISOLATION_ERROR = defined?(Ractor::IsolationError) ? Ractor::IsolationError : Class.new(StandardError) # :nodoc:
+  private_constant :CACHE_ISOLATION_ERROR
+
   def self.new(version) # :nodoc:
     return super unless self == Gem::Version
 
     @@all[version] ||= super
+  rescue CACHE_ISOLATION_ERROR
+    super
   end
 
   ##
@@ -251,14 +258,9 @@ class Gem::Version
   # Pre-release (alpha) parts, e.g, 5.3.1.b.2 => 5.4, are ignored.
 
   def bump
-    @@bump[self] ||= begin
-                       segments = self.segments
-                       segments.pop while segments.any? {|s| String === s }
-                       segments.pop if segments.size > 1
-
-                       segments[-1] = segments[-1].succ
-                       self.class.new segments.join(".")
-                     end
+    @@bump[self] ||= compute_bump
+  rescue CACHE_ISOLATION_ERROR
+    compute_bump
   end
 
   ##
@@ -329,13 +331,9 @@ class Gem::Version
   # Non-prerelease versions return themselves.
 
   def release
-    @@release[self] ||= if prerelease?
-      segments = self.segments
-      segments.pop while segments.any? {|s| String === s }
-      self.class.new segments.join(".")
-    else
-      self
-    end
+    @@release[self] ||= compute_release
+  rescue CACHE_ISOLATION_ERROR
+    compute_release
   end
 
   def segments # :nodoc:
@@ -440,6 +438,23 @@ class Gem::Version
   protected
 
   attr_reader :sort_key # :nodoc:
+
+  def compute_bump # :nodoc:
+    segments = self.segments
+    segments.pop while segments.any? {|s| String === s }
+    segments.pop if segments.size > 1
+
+    segments[-1] = segments[-1].succ
+    self.class.new segments.join(".")
+  end
+
+  def compute_release # :nodoc:
+    return self unless prerelease?
+
+    segments = self.segments
+    segments.pop while segments.any? {|s| String === s }
+    self.class.new segments.join(".")
+  end
 
   def compute_sort_key
     return if prerelease?
