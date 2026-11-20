@@ -565,5 +565,11 @@ lib/rubygems/version.rb
 lib/rubygems/version_option.rb
 lib/rubygems/win_platform.rb
 lib/rubygems/yaml_serializer.rb
+lib/rubygems/yaml_serializer/builder.rb
+lib/rubygems/yaml_serializer/core.rb
+lib/rubygems/yaml_serializer/emitter.rb
+lib/rubygems/yaml_serializer/nodes.rb
+lib/rubygems/yaml_serializer/parser.rb
+lib/rubygems/yaml_serializer/psych_errors.rb
 rubygems-update.gemspec
 setup.rb

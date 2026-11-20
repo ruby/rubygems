@@ -23,6 +23,7 @@ class QualityCheck
     check_lib_language_quality
     check_documented_settings
     check_vendored_net_http_sync
+    check_vendored_uri_entry_sync
     check_gem_build
     check_shipped_files
 
@@ -146,6 +147,17 @@ class QualityCheck
     @errors << "#{spec_implementation_path} is out of sync with #{lib_implementation_path}"
   end
 
+  def check_vendored_uri_entry_sync
+    entry_path = File.join(@source_root, "lib", "rubygems", "vendor", "uri", "lib", "uri.rb")
+    loader_path = File.join(@source_root, "lib", "bundler", "vendored_uri.rb")
+
+    entry_files = File.read(entry_path).scan(/^require_relative ['"]([^'"]+)['"]/).flatten.map { _1.delete_prefix("uri/") }
+    loader_files = File.read(loader_path)[/%w\[([^\]]*)\]\.each/, 1]&.split
+
+    return if entry_files == loader_files
+    @errors << "#{loader_path} loads #{loader_files.inspect}, but #{entry_path} loads #{entry_files.inspect}"
+  end
+
   def check_gem_build
     Dir.mktmpdir do |dir|
       gem_path = File.join(dir, loaded_gemspec.file_name)
@@ -161,7 +173,7 @@ class QualityCheck
   end
 
   def check_shipped_files
-    git_list = tracked_files.reject {|f| f.start_with?("spec/") }
+    git_list = tracked_files.reject {|f| f.start_with?("spec/") } - %w[lib/rubygems/vendor/uri/lib/uri.rb lib/rubygems/yaml_serializer.rb]
     gem_list = loaded_gemspec.files
 
     (git_list - gem_list).each do |file|
@@ -260,7 +272,7 @@ class QualityCheck
   end
 
   def tracked_files
-    @tracked_files ||= git_ls_files("exe/bundle exe/bundler lib/bundler lib/bundler.rb lib/rubygems/vendor/uri lib/rubygems/vendor/securerandom lib/rubygems/vendor/pub_grub lib/rubygems/yaml_serializer.rb lib/rubygems/cooldown_settings.rb lib/rubygems/compact_index_client* lib/rubygems/credential_store* bundler.gemspec MIT.txt")
+    @tracked_files ||= git_ls_files("exe/bundle exe/bundler lib/bundler lib/bundler.rb lib/rubygems/vendor/uri lib/rubygems/vendor/securerandom lib/rubygems/vendor/pub_grub lib/rubygems/yaml_serializer* lib/rubygems/cooldown_settings.rb lib/rubygems/compact_index_client* lib/rubygems/credential_store* bundler.gemspec MIT.txt")
   end
 
   def lib_tracked_files
