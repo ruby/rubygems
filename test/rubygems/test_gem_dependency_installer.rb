@@ -806,6 +806,91 @@ class TestGemDependencyInstaller < Gem::TestCase
     assert File.exist?(File.join(gemhome2, "cache", @a1.file_name))
   end
 
+  def test_install_install_dir_existing_dependency
+    util_setup_gems
+
+    _, e1_gem = util_gem "e", "1" do |s|
+      s.add_dependency "b"
+    end
+
+    _, b2_gem = util_gem "b", "2" do |s|
+      s.add_dependency "a"
+    end
+
+    FileUtils.mv @a1_gem, @tempdir
+    FileUtils.mv @b1_gem, @tempdir
+    FileUtils.mv  b2_gem, @tempdir
+    FileUtils.mv  e1_gem, @tempdir
+
+    gemhome2 = File.join @tempdir, "gemhome2"
+    inst = nil
+
+    Dir.chdir @tempdir do
+      inst = Gem::DependencyInstaller.new install_dir: gemhome2, ignore_dependencies: true
+      inst.install "b", req("= 1")
+    end
+
+    assert_equal %w[b-1], inst.installed_gems.map(&:full_name),
+                 "sanity check"
+
+    Dir.chdir @tempdir do
+      inst = Gem::DependencyInstaller.new install_dir: gemhome2
+      inst.install "e"
+    end
+
+    assert_equal %w[a-1 e-1], inst.installed_gems.map(&:full_name)
+  end
+
+  def test_install_install_dir_default_gem_dependency
+    util_setup_gems
+
+    install_default_gems new_default_spec("a", "1")
+
+    FileUtils.mv @a1_gem, @tempdir
+    FileUtils.mv @b1_gem, @tempdir
+
+    gemhome2 = File.join @tempdir, "gemhome2"
+    inst = nil
+
+    Dir.chdir @tempdir do
+      inst = Gem::DependencyInstaller.new install_dir: gemhome2
+      inst.install "b"
+    end
+
+    assert_equal %w[a-1 b-1], inst.installed_gems.map(&:full_name)
+  end
+
+  def test_install_install_dir_build_root
+    util_setup_gems
+
+    _, e1_gem = util_gem "e", "1" do |s|
+      s.add_dependency "b"
+    end
+
+    _, b2_gem = util_gem "b", "2" do |s|
+      s.add_dependency "a"
+    end
+
+    FileUtils.mv @a1_gem, @tempdir
+    FileUtils.mv @b1_gem, @tempdir
+    FileUtils.mv  b2_gem, @tempdir
+    FileUtils.mv  e1_gem, @tempdir
+
+    gemhome2 = File.join @tempdir, "gemhome2"
+    build_root = File.join @tempdir, "build_root"
+    inst = nil
+
+    Dir.chdir @tempdir do
+      inst = Gem::DependencyInstaller.new install_dir: gemhome2, ignore_dependencies: true
+      inst.install "b", req("= 1")
+
+      inst = Gem::DependencyInstaller.new install_dir: gemhome2, build_root: build_root
+      inst.install "e"
+    end
+
+    assert_equal %w[a-1 b-2 e-1], inst.installed_gems.map(&:full_name)
+  end
+
   def test_install_domain_both
     util_setup_gems
 
