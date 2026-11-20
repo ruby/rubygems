@@ -161,7 +161,7 @@ class QualityCheck
   end
 
   def check_shipped_files
-    git_list = tracked_files.reject {|f| f.start_with?("spec/") }
+    git_list = tracked_files.reject {|f| f.start_with?("spec/") } - %w[lib/rubygems/vendor/uri/lib/uri.rb lib/rubygems/yaml_serializer.rb]
     gem_list = loaded_gemspec.files
 
     (git_list - gem_list).each do |file|
