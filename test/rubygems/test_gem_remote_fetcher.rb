@@ -819,6 +819,13 @@ class TestGemRemoteFetcher < Gem::TestCase
     end
   end
 
+  # The per-source subdirectory of the global gem cache for
+  # http://gems.example.com. The slug is the one
+  # Bundler::Source::Rubygems::Remote#cache_slug computes for the same
+  # source, so that both tools share the cache: host and port, then the MD5
+  # of "gems.example.com.80./".
+  GLOBAL_GEM_CACHE_SLUG = "gems.example.com.80.04eee0ca836f2ede17ff02561f9f5516"
+
   def test_download_with_global_gem_cache
     # Use a temp directory to safely test global cache behavior
     test_cache_dir = File.join(@tempdir, "global_gem_cache_test")
@@ -833,10 +840,38 @@ class TestGemRemoteFetcher < Gem::TestCase
       end
       fetcher.instance_variable_set(:@test_gem_dir, File.dirname(@a1_gem))
 
-      # With global cache enabled, gem goes directly to global cache
-      global_cache_gem = File.join(test_cache_dir, @a1.file_name)
+      # With global cache enabled, gem goes directly to the global cache
+      # directory of its source
+      global_cache_gem = File.join(test_cache_dir, GLOBAL_GEM_CACHE_SLUG, @a1.file_name)
       assert_equal global_cache_gem, fetcher.download(@a1, "http://gems.example.com")
       assert File.exist?(global_cache_gem), "Gem should be in global cache"
+      refute File.exist?(File.join(test_cache_dir, @a1.file_name)),
+             "Gem should not be in the global cache outside its source directory"
+    end
+  ensure
+    Gem.configuration.global_gem_cache = false
+  end
+
+  def test_download_with_global_gem_cache_keys_source_by_host_user_port_and_path
+    test_cache_dir = File.join(@tempdir, "global_gem_cache_test")
+
+    Gem.stub :global_gem_cache_path, test_cache_dir do
+      Gem.configuration.global_gem_cache = true
+
+      fetcher = Gem::RemoteFetcher.fetcher
+      def fetcher.fetch_path(uri, *rest)
+        File.binread File.join(@test_gem_dir, "a-1.gem")
+      end
+      fetcher.instance_variable_set(:@test_gem_dir, File.dirname(@a1_gem))
+
+      # Bundler keys the source with a trailing slash, the password is left out
+      # of the slug and the path only reaches the digest: the MD5 of
+      # "gems.example.com.user.8443./sub/"
+      slug = "gems.example.com.user.8443.7651d9d426aaf515caac15125c7549a9"
+      global_cache_gem = File.join(test_cache_dir, slug, @a1.file_name)
+
+      assert_equal global_cache_gem, fetcher.download(@a1, "https://user:secret@gems.example.com:8443/sub")
+      assert File.exist?(global_cache_gem)
     end
   ensure
     Gem.configuration.global_gem_cache = false
@@ -850,8 +885,9 @@ class TestGemRemoteFetcher < Gem::TestCase
       Gem.configuration.global_gem_cache = true
 
       # Pre-populate global cache
-      FileUtils.mkdir_p test_cache_dir
-      global_cache_gem = File.join(test_cache_dir, @a1.file_name)
+      source_cache_dir = File.join(test_cache_dir, GLOBAL_GEM_CACHE_SLUG)
+      FileUtils.mkdir_p source_cache_dir
+      global_cache_gem = File.join(source_cache_dir, @a1.file_name)
       FileUtils.cp @a1_gem, global_cache_gem
 
       fetcher = Gem::RemoteFetcher.fetcher
@@ -859,6 +895,89 @@ class TestGemRemoteFetcher < Gem::TestCase
       # Should return global cache path without downloading
       result = fetcher.download(@a1, "http://gems.example.com")
       assert_equal global_cache_gem, result
+    end
+  ensure
+    Gem.configuration.global_gem_cache = false
+  end
+
+  def test_download_with_global_gem_cache_does_not_share_gems_between_sources
+    test_cache_dir = File.join(@tempdir, "global_gem_cache_test")
+
+    Gem.stub :global_gem_cache_path, test_cache_dir do
+      Gem.configuration.global_gem_cache = true
+
+      # Each source serves its own build of a-1.gem
+      fetcher = Gem::RemoteFetcher.fetcher
+      def fetcher.fetch_path(uri, *rest)
+        @fetched_uris << uri.to_s
+        "#{uri.host} build of #{File.basename(uri.path)}"
+      end
+      fetcher.instance_variable_set(:@fetched_uris, [])
+
+      first_gem = fetcher.download(@a1, "http://gems.example.com")
+      second_gem = fetcher.download(@a1, "http://other.example.com")
+
+      refute_equal first_gem, second_gem
+      assert_equal "gems.example.com build of a-1.gem", File.read(first_gem)
+      assert_equal "other.example.com build of a-1.gem", File.read(second_gem)
+      assert_equal ["http://gems.example.com/gems/a-1.gem", "http://other.example.com/gems/a-1.gem"],
+                   fetcher.instance_variable_get(:@fetched_uris)
+
+      # A gem cached from one source stays cached for that source only
+      assert_equal first_gem, fetcher.download(@a1, "http://gems.example.com")
+      assert_equal 2, fetcher.instance_variable_get(:@fetched_uris).size
+    end
+  ensure
+    Gem.configuration.global_gem_cache = false
+  end
+
+  def test_download_with_global_gem_cache_ignores_gem_cached_outside_its_source_directory
+    test_cache_dir = File.join(@tempdir, "global_gem_cache_test")
+
+    Gem.stub :global_gem_cache_path, test_cache_dir do
+      Gem.configuration.global_gem_cache = true
+
+      # A gem at the top of the global cache belongs to no source
+      FileUtils.mkdir_p test_cache_dir
+      FileUtils.cp @a1_gem, File.join(test_cache_dir, @a1.file_name)
+
+      fetcher = Gem::RemoteFetcher.fetcher
+      def fetcher.fetch_path(uri, *rest)
+        @fetched = true
+        File.binread File.join(@test_gem_dir, "a-1.gem")
+      end
+      fetcher.instance_variable_set(:@test_gem_dir, File.dirname(@a1_gem))
+
+      global_cache_gem = File.join(test_cache_dir, GLOBAL_GEM_CACHE_SLUG, @a1.file_name)
+      assert_equal global_cache_gem, fetcher.download(@a1, "http://gems.example.com")
+      assert fetcher.instance_variable_get(:@fetched), "Gem should be downloaded from its source"
+    end
+  ensure
+    Gem.configuration.global_gem_cache = false
+  end
+
+  def test_download_with_global_gem_cache_without_md5
+    test_cache_dir = File.join(@tempdir, "global_gem_cache_test")
+
+    Gem.stub :global_gem_cache_path, test_cache_dir do
+      Gem.configuration.global_gem_cache = true
+
+      # Without MD5, under FIPS for instance, the cache cannot be keyed by
+      # source, so the gem goes to the cache of the installation instead
+      fetcher = Gem::RemoteFetcher.fetcher
+      def fetcher.fetch_path(uri, *rest)
+        File.binread File.join(@test_gem_dir, "a-1.gem")
+      end
+
+      def fetcher.md5_available?
+        false
+      end
+      fetcher.instance_variable_set(:@test_gem_dir, File.dirname(@a1_gem))
+
+      a1_cache_gem = @a1.cache_file
+      assert_equal a1_cache_gem, fetcher.download(@a1, "http://gems.example.com")
+      assert File.exist?(a1_cache_gem)
+      refute File.exist?(test_cache_dir)
     end
   ensure
     Gem.configuration.global_gem_cache = false
