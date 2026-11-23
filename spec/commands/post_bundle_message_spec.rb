@@ -35,23 +35,47 @@ RSpec.describe "post bundle message" do
       bundle_config "without emo"
       bundle :install
       expect(out).to include(bundle_show_system_message)
-      expect(out).to include("Gems in the group 'emo' were not installed")
+      expect(out).to include("Gems in the group 'emo' were not installed, except for 'activesupport' because it is also part of the non-excluded group 'test'.")
       expect(out).to include(bundle_complete_message)
       expect(out).to include(installed_gems_stats)
 
       bundle_config "without emo test"
       bundle :install
       expect(out).to include(bundle_show_system_message)
-      expect(out).to include("Gems in the groups 'emo' and 'test' were not installed")
+      expect(out).to include("Gems in the groups 'emo' and 'test' were not installed.")
       expect(out).to include(bundle_complete_message)
       expect(out).to include("4 Gemfile dependencies, 2 gems now installed.")
 
       bundle_config "without emo obama test"
       bundle :install
       expect(out).to include(bundle_show_system_message)
-      expect(out).to include("Gems in the groups 'emo', 'obama' and 'test' were not installed")
+      expect(out).to include("Gems in the groups 'emo', 'obama' and 'test' were not installed.")
+      expect(out).to_not include("except for")
       expect(out).to include(bundle_complete_message)
       expect(out).to include("4 Gemfile dependencies, 1 gem now installed.")
+    end
+
+    describe "when gems in excluded groups are also part of non-excluded groups" do
+      before do
+        gemfile <<-G
+          source "https://gem.repo1"
+          gem "myrack"
+          gem "activesupport", "2.3.5", :group => [:emo, :obama, :test]
+          gem "myrack-obama", :group => [:obama, :test]
+        G
+      end
+
+      it "lists the gems installed anyway and the non-excluded groups they belong to" do
+        bundle_config "without emo"
+        bundle :install
+        expect(out).to include("Gems in the group 'emo' were not installed, except for 'activesupport' because it is also part of the non-excluded groups 'obama' and 'test'.")
+      end
+
+      it "lists several gems when several of them are installed anyway" do
+        bundle_config "without emo obama"
+        bundle :install
+        expect(out).to include("Gems in the groups 'emo' and 'obama' were not installed, except for 'activesupport' and 'myrack-obama' because they are also part of the non-excluded group 'test'.")
+      end
     end
 
     describe "for second bundle install run" do
@@ -164,7 +188,7 @@ RSpec.describe "post bundle message" do
       bundle_config "without emo"
       bundle :install
       bundle :update, all: true
-      expect(out).to include("Gems in the group 'emo' were not updated")
+      expect(out).to include("Gems in the group 'emo' were not updated, except for 'activesupport' because it is also part of the non-excluded group 'test'.")
       expect(out).to include(bundle_updated_message)
 
       bundle_config "without emo test"

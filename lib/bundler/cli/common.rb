@@ -80,16 +80,44 @@ module Bundler
 
     def self.without_groups_message(command)
       command_in_past_tense = command == :install ? "installed" : "updated"
-      groups = Bundler.settings[:without]
-      "Gems in the #{verbalize_groups(groups)} were not #{command_in_past_tense}."
+      groups = Bundler.settings[:without].map(&:to_s)
+      exceptions = gems_installed_despite_exclusion(groups)
+      message = "Gems in the #{verbalize_groups(groups)} were not #{command_in_past_tense}"
+      return "#{message}." if exceptions.empty?
+
+      included_groups = exceptions.flat_map {|_, gem_groups| gem_groups }.uniq
+      pronoun = exceptions.size == 1 ? "it is" : "they are"
+      "#{message}, except for #{verbalize_list(exceptions.map(&:first))} " \
+        "because #{pronoun} also part of the non-excluded #{verbalize_groups(included_groups)}."
+    end
+
+    # Gems that belong to one of the excluded groups, but are still installed
+    # because they also belong to a group that is not excluded. Without this,
+    # the "Gems in the group ... were not installed" message is not accurate.
+    def self.gems_installed_despite_exclusion(groups)
+      exceptions = {}
+      Bundler.definition.dependencies.each do |dependency|
+        dependency_groups = dependency.groups.map(&:to_s).uniq
+        next unless dependency_groups.any? {|group| groups.include?(group) }
+
+        included_groups = dependency_groups - groups
+        next if included_groups.empty?
+
+        (exceptions[dependency.name] ||= []).concat(included_groups)
+      end
+
+      exceptions.each_value(&:uniq!)
+      exceptions.to_a
     end
 
     def self.verbalize_groups(groups)
-      groups.map! {|g| "'#{g}'" }
-      group_list = [groups[0...-1].join(", "), groups[-1..-1]].
+      "#{groups.size == 1 ? "group" : "groups"} #{verbalize_list(groups)}"
+    end
+
+    def self.verbalize_list(items)
+      quoted_items = items.map {|item| "'#{item}'" }
+      [quoted_items[0...-1].join(", "), quoted_items[-1..-1]].
         reject {|s| s.to_s.empty? }.join(" and ")
-      group_str = groups.size == 1 ? "group" : "groups"
-      "#{group_str} #{group_list}"
     end
 
     def self.select_spec(name, regex_match = nil)
