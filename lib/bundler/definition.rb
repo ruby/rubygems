@@ -628,6 +628,9 @@ module Bundler
         checksum = Checksum.from_gem_package(package)
         spec.source.checksum_store.register(spec, checksum)
       end
+
+      # Sources used only by optional or excluded groups are not materialized above.
+      sources.rubygems_sources.each(&:specs)
     end
 
     private
