@@ -393,6 +393,7 @@ module Bundler
       will create binstubs for all given gems.
     D
     method_option "force", type: :boolean, default: false, banner: "Overwrite existing binstubs if they exist"
+    method_option "gemfile", type: :string, banner: "Use the specified gemfile instead of Gemfile"
     method_option "path", type: :string, lazy_default: "bin", banner: "Binstub destination directory, `bin` by default (removed)"
     method_option "shebang", type: :string, banner: "Specify a different shebang executable name than the default (usually 'ruby')"
     method_option "standalone", type: :boolean, banner: "Make binstubs that can work without the Bundler runtime"
