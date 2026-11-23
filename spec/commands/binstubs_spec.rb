@@ -13,6 +13,35 @@ RSpec.describe "bundle binstubs <gem>" do
       expect(bundled_app("bin/myrackup")).to exist
     end
 
+    it "uses the Gemfile specified with --gemfile" do
+      install_gemfile "CustomGemfile", <<-G, gemfile: "CustomGemfile"
+        source "https://gem.repo1"
+        gem "myrack", "1.0.0"
+      G
+
+      gemfile <<-G
+        source "https://gem.repo1"
+        gem "myrack", "0.9.1"
+      G
+
+      bundle "binstubs myrack --gemfile CustomGemfile", env: { "BUNDLE_GEMFILE" => "Gemfile" }
+
+      ruby "load #{bundled_app("bin/myrackup").to_s.dump}"
+      expect(out).to eq("1.0.0")
+    end
+
+    it "uses a relative --gemfile path with --all outside the bundle directory" do
+      install_gemfile "CustomGemfile", <<-G, gemfile: "CustomGemfile"
+        source "https://gem.repo1"
+        gem "myrack"
+      G
+
+      bundle "binstubs --all --gemfile=bundled_app/CustomGemfile", dir: tmp
+
+      ruby "load #{bundled_app("bin/myrackup").to_s.dump}", dir: tmp
+      expect(out).to eq("1.0.0")
+    end
+
     it "does not install other binstubs" do
       install_gemfile <<-G
         source "https://gem.repo1"
