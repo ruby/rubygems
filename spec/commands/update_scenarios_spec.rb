@@ -281,6 +281,33 @@ RSpec.describe "bundle update --ruby" do
     end
   end
 
+  context "when updating conservatively" do
+    before do
+      build_repo2
+
+      install_gemfile <<-G
+        ruby '~> #{Gem.ruby_version}'
+        source "https://gem.repo2"
+        gem "activesupport"
+      G
+
+      gemfile <<-G
+        ruby '~> #{current_ruby_minor}'
+        source "https://gem.repo2"
+        gem "activesupport"
+      G
+
+      update_repo2 { build_gem "activesupport", "3.0" }
+    end
+
+    it "updates the Ruby version without updating gems" do
+      bundle "update --ruby --conservative"
+
+      expect(lockfile).to include("RUBY VERSION\n  #{Bundler::RubyVersion.system}")
+      expect(the_bundle).to include_gems "activesupport 2.3.5"
+    end
+  end
+
   context "when a different Ruby is being used than has been versioned" do
     before do
       install_gemfile <<-G
@@ -439,6 +466,26 @@ RSpec.describe "bundle update --bundler" do
         #{Bundler::VERSION}
     L
 
+    expect(the_bundle).to include_gem "myrack 1.0"
+  end
+
+  it "updates the bundler version without updating gems when updating conservatively" do
+    build_repo4 do
+      build_gem "bundler", "2.3.9"
+      build_gem "myrack", "1.0"
+    end
+
+    install_gemfile <<-G
+      source "https://gem.repo4"
+      gem "myrack"
+    G
+    lockfile lockfile.sub(/(^\s*)#{Bundler::VERSION}($)/, "2.3.9")
+
+    build_repo4 { build_gem "myrack", "2.0" }
+
+    bundle :update, bundler: true, conservative: true
+
+    expect(lockfile).to end_with("BUNDLED WITH\n  #{Bundler::VERSION}\n")
     expect(the_bundle).to include_gem "myrack 1.0"
   end
 

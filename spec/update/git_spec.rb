@@ -101,6 +101,24 @@ RSpec.describe "bundle update" do
       expect(the_bundle).to include_gems "foo 1.1"
     end
 
+    it "updates only the given source when updating conservatively" do
+      build_repo2
+      build_git "foo", "1.0", path: lib_path("foo")
+
+      install_gemfile <<-G
+        source "https://gem.repo2"
+        gem "activesupport"
+        gem "foo", :git => "#{lib_path("foo")}"
+      G
+
+      update_repo2 { build_gem "activesupport", "3.0" }
+      update_git "foo", "1.1", path: lib_path("foo")
+
+      bundle "update --source foo --conservative"
+
+      expect(the_bundle).to include_gems "foo 1.1", "activesupport 2.3.5"
+    end
+
     it "floats on main when updating all gems that are pinned to the source even if you have child dependencies" do
       build_git "foo", path: lib_path("foo")
       build_gem "bar", to_bundle: true do |s|

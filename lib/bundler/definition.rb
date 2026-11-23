@@ -81,7 +81,8 @@ module Bundler
         @unlocking = unlock.any? {|_k, v| !Array(v).empty? }
         @sources_to_unlock = unlock.delete(:sources) || []
         @unlocking_ruby = unlock.delete(:ruby)
-        @explicit_unlocks = unlock.delete(:gems) || []
+        requested_gems = unlock.delete(:gems)
+        @explicit_unlocks = requested_gems || []
         conservative = unlock.delete(:conservative)
       end
 
@@ -169,7 +170,7 @@ module Bundler
       @path_changes = converge_paths
 
       if conservative
-        @gems_to_unlock = @explicit_unlocks.any? ? @explicit_unlocks : @dependencies.map(&:name)
+        @gems_to_unlock = requested_gems || @dependencies.map(&:name)
       else
         eager_unlock = @explicit_unlocks.map {|name| Dependency.new(name, ">= 0") }
         @gems_to_unlock = @locked_specs.for(eager_unlock, platforms).map(&:name).uniq
