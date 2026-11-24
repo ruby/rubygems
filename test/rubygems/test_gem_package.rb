@@ -954,7 +954,8 @@ class TestGemPackage < Gem::Package::TarTestCase
     package.extract_tar_gz tgz_io, @destination
 
     dirpath = File.join @destination, "lib"
-    assert_equal 0o40755.to_s(8), File.stat(dirpath).mode.to_s(8)
+    mode = 0o40755 & ~File.umask
+    assert_equal mode.to_s(8), File.stat(dirpath).mode.to_s(8)
 
     filepath = File.join @destination, "lib/foo.rb"
     mode = 0o100644 & ~File.umask
@@ -963,6 +964,26 @@ class TestGemPackage < Gem::Package::TarTestCase
     filepath = File.join @destination, "bin/foo"
     mode = 0o100755 & ~File.umask
     assert_equal mode.to_s(8), File.stat(filepath).mode.to_s(8)
+  end
+
+  def test_extract_tar_gz_directory_mode_respects_umask
+    pend "chmod not supported" if Gem.win_platform?
+
+    package = Gem::Package.new @gem
+
+    tgz_io = util_tar_gz do |tar|
+      tar.mkdir "lib", 0o777
+    end
+
+    umask = File.umask(0o022)
+    begin
+      package.extract_tar_gz tgz_io, @destination
+    ensure
+      File.umask(umask)
+    end
+
+    dirpath = File.join @destination, "lib"
+    assert_equal 0o40755.to_s(8), File.stat(dirpath).mode.to_s(8)
   end
 
   def test_extract_tar_gz_absolute
