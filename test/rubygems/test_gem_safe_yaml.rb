@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "helper"
+require "psych"
 
 Gem.load_yaml
 
@@ -197,6 +198,57 @@ class TestGemSafeYAML < Gem::TestCase
 
   def test_later_documents_are_ignored
     assert_equal "a", Gem::SafeYAML.safe_load("--- a\n--- [unclosed\n")
+  end
+
+  def test_later_mapping_documents_are_not_merged
+    yaml = "---\nname: first\nextensions: []\n---\nextensions:\n- ext/extconf.rb\n"
+    expected = { "name" => "first", "extensions" => [] }
+    assert_equal expected, Gem::SafeYAML.safe_load(yaml)
+    assert_equal expected, Gem::YAMLSerializer.load(yaml)
+    assert_equal expected, Psych.safe_load(yaml)
+  end
+
+  def test_later_documents_are_ignored_after_leading_comments_or_without_opening_marker
+    [
+      "# comment\n---\na: 1\n--- \nb: 2\n",
+      "a: 1\n---\nb: 2\n",
+    ].each do |input|
+      assert_equal Psych.safe_load(input), Gem::YAMLSerializer.load(input), input
+    end
+  end
+
+  def test_indented_document_marker_in_block_scalar_is_content
+    input = "a: |\n  ---\n"
+    assert_equal({ "a" => "---\n" }, Gem::YAMLSerializer.load(input))
+    assert_equal Psych.safe_load(input), Gem::YAMLSerializer.load(input)
+  end
+
+  def test_document_start_marker_forms
+    assert_equal({ "a" => 1 }, yaml_load("---\na: 1\n--- # second\nb: 2\n"))
+    assert_equal({ "a" => 1 }, yaml_load("a: 1\n---\tb: 2\n"))
+    assert_equal({ "a" => 1 }, yaml_load("a: 1\r\n---\r\nb: 2\r\n"))
+    assert_equal({ "a" => 1 }, yaml_load("a: 1\n--- b: 2\n"))
+    assert_equal({}, yaml_load("--- {}\n---\na: 1\n"))
+    assert_nil Gem::SafeYAML.safe_load("---\n---\na: 1\n")
+    assert_equal({ "a" => 1, "---x" => 2 }, yaml_load("a: 1\n---x: 2\n"))
+  end
+
+  def test_later_specification_documents_are_ignored
+    yaml = <<~YAML
+      --- !ruby/object:Gem::Specification
+      name: first
+      version: !ruby/object:Gem::Version
+        version: 1.0.0
+      extensions: []
+      --- !ruby/object:Gem::Specification
+      name: second
+      extensions:
+      - ext/extconf.rb
+    YAML
+
+    spec = Gem::SafeYAML.safe_load(yaml)
+    assert_equal "first", spec.name
+    assert_equal [], spec.extensions
   end
 
   def test_unused_anchor_with_aliases_disabled_is_allowed
@@ -1038,6 +1090,35 @@ class TestGemSafeYAML < Gem::TestCase
 
     expected = { "BUNDLE_MIRROR__HTTPS://RUBYGEMS__ORG/" => "http://example-mirror.rubygems.org" }
     assert_equal expected, yaml_load(yaml)
+  end
+
+  def test_dump_url_keys_unquoted
+    # The serializer that RubyGems 4.0 and Bundler 4.0 ship keeps quotes as
+    # part of a key
+    hash = {
+      "BUNDLE_MIRROR__HTTPS://RUBYGEMS__ORG/" => "https://mirror.example.com",
+      "BUNDLE_MIRROR__HTTP://LOCALHOST:9292/" => "http://localhost:9293",
+    }
+    yaml = yaml_dump(hash)
+
+    assert_include yaml, "\nBUNDLE_MIRROR__HTTPS://RUBYGEMS__ORG/: "
+    assert_include yaml, "\nBUNDLE_MIRROR__HTTP://LOCALHOST:9292/: "
+    assert_equal hash, yaml_load(yaml)
+  end
+
+  def test_dump_quotes_keys_psych_would_read_differently
+    require "yaml"
+
+    hash = {
+      "have: colon-space" => "a",
+      "trailing:" => "b",
+      "1:20" => "c",
+      "2001-12-14 21:59:43" => "d",
+    }
+    yaml = Gem::YAMLSerializer.dump(hash)
+
+    assert_equal hash, Psych.safe_load(yaml)
+    assert_equal hash, Gem::YAMLSerializer.load(yaml)
   end
 
   def test_psych_interop_roundtrip
