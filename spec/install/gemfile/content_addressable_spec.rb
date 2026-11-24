@@ -776,6 +776,26 @@ RSpec.describe "bundle install with content-addressable gems", :compact_index, r
       end
     end
   end
+
+  it "refuses a frozen install when a content-addressed row has no digest even though the platform gem has one" do
+    simulate_platform "x86_64-linux" do
+      build_repo2_with_content_addressed_gems
+
+      gemfile <<~G
+        source "https://gem.repo2"
+
+        gem "mygem"
+      G
+
+      lockfile_with_content_addresses(addresses(current_abi), checksums: true, without_digests: [current_address], ruby_abis: [current_abi])
+
+      bundle_config "frozen true"
+      bundle_with_content_addressed_gems "install", raise_on_error: false
+
+      expect(err).to include("Your lockfile has an empty CHECKSUMS entry for \"mygem\", but can't be updated because frozen mode is set")
+      expect(out).not_to include("Installing mygem")
+    end
+  end
 end
 
 RSpec.describe "bundle install with content-addressable gems invisible to pre-4.1 RubyGems clients", :compact_index, rubygems: ">= 4.1.0.a" do

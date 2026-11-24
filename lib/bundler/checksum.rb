@@ -217,8 +217,7 @@ module Bundler
       def empty?(spec)
         return false unless spec.source.is_a?(Bundler::Source::Rubygems)
 
-        checksums = @store[spec.full_name]
-        return checksums.empty? if checksums
+        return true if @store[spec.full_name]&.empty?
 
         content_addressed_full_names(spec).any? {|full_name| @store[full_name].nil? }
       end
