@@ -709,6 +709,29 @@ RSpec.describe "bundle install with content-addressable gems", :compact_index, r
       expect(lockfile).to eq(original_lockfile)
     end
   end
+
+  it "does not fall back to a ruby gem the lockfile does not lock in frozen mode under a Ruby ABI the lockfile does not cover" do
+    simulate_platform "x86_64-linux" do
+      build_repo2_with_content_addressed_gems(platform_gem: false)
+
+      gemfile <<~G
+        source "https://gem.repo2"
+
+        gem "mygem"
+      G
+
+      lockfile_with_content_addresses(addresses(mismatched_abi), ruby_abis: [mismatched_abi])
+      original_lockfile = lockfile
+
+      bundle_config "frozen true"
+      bundle_with_content_addressed_gems "install", raise_on_error: false
+
+      expect(last_command).to be_failure
+      expect(err).to include("mygem-1.0-#{mismatched_address} requires ruby version ~> #{mismatched_abi}.0")
+      expect(the_bundle).not_to include_gems "mygem 1.0"
+      expect(lockfile).to eq(original_lockfile)
+    end
+  end
 end
 
 RSpec.describe "bundle install with content-addressable gems invisible to pre-4.1 RubyGems clients", :compact_index, rubygems: ">= 4.1.0.a" do
