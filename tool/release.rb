@@ -495,12 +495,14 @@ class Release
       head = @level == :minor_or_major ? "HEAD" : "origin/master"
       pulls = pull_requests_merged_into("master", @previous_release_tag, head)
 
-      # Dedicated backport PRs target the stable branch instead of master, so
-      # the listing above cannot see them and their changelog entries would
-      # otherwise be dropped from the release.
-      pulls += pull_requests_merged_into(@stable_branch, @last_release_tag, "origin/#{@stable_branch}") if @level == :patch
-
-      pulls.reject! {|pull| released_commit_shas.include?(pull.merge_commit_sha) } if @level == :patch
+      if @level == :patch
+        # Dedicated backport PRs target the stable branch instead of master, so
+        # the listing above cannot see them and their changelog entries would
+        # otherwise be dropped from the release.
+        backports = pull_requests_merged_into(@stable_branch, @last_release_tag, "origin/#{@stable_branch}")
+        covered = released_commit_shas | backported_commit_shas(backports)
+        pulls = (pulls + backports).reject {|pull| covered.include?(pull.merge_commit_sha) }
+      end
 
       pulls
     end
@@ -575,30 +577,46 @@ class Release
     )
   end
 
-  # True when the PR's merged commit is already reachable from the release
-  # branch, e.g. a backport PR merged straight onto the stable branch rather
-  # than cherry-picked from master.
+  # True when the PR is already on the release branch, either merged straight
+  # onto the stable branch or cherry-picked there ahead of this release.
   def already_on_stable_branch?(pr)
-    system("git", "merge-base", "--is-ancestor", pr.merge_commit_sha, "HEAD", out: IO::NULL, err: IO::NULL)
+    unreleased_cherry_picked_shas.include?(pr.merge_commit_sha) ||
+      system("git", "merge-base", "--is-ancestor", pr.merge_commit_sha, "HEAD", out: IO::NULL, err: IO::NULL)
   end
 
-  # Source SHAs already cherry-picked onto the stable branch, derived from the
-  # `(cherry picked from commit X)` footer that `git cherry-pick -x` records.
-  # When the footer references a merge commit (PRs merged with "Create a merge
-  # commit", picked with `-m 1`), also include the individual PR commits the
-  # merge introduced, so that a pull request is recognized as released no
-  # matter which of its commits the footer names.
+  # Source SHAs that earlier releases on this line shipped.
   def released_commit_shas
-    @released_commit_shas ||= begin
-      log = `git log --format=%B #{@previous_release_tag}..origin/#{@stable_branch}`
-      shas = Set.new
-      log.scan(/cherry picked from commit ([0-9a-f]+)/).flatten.each do |sha|
-        shas << sha
-        parents = git_quietly("rev-list", "--parents", "-n", "1", sha).strip.split.drop(1)
-        next unless parents.size >= 2
-        shas.merge(`git log --format=%H #{parents[0]}..#{parents[1]}`.split("\n"))
-      end
-      shas
+    @released_commit_shas ||= cherry_picked_shas("#{@previous_release_tag}..#{@last_release_tag}")
+  end
+
+  # Source SHAs cherry-picked onto the stable branch since the last release.
+  # They still belong in this release's changelog.
+  def unreleased_cherry_picked_shas
+    @unreleased_cherry_picked_shas ||= cherry_picked_shas("#{@last_release_tag}..origin/#{@stable_branch}")
+  end
+
+  # A labelled backport PR carries its own changelog entry, so the master PRs
+  # it cherry-picked must not get a second one.
+  def backported_commit_shas(backports)
+    backports.select {|pull| @changelog.labelled?(pull) }.reduce(Set.new) do |shas, pull|
+      shas | cherry_picked_shas("#{pull.merge_commit_sha}~1..#{pull.merge_commit_sha}")
     end
+  end
+
+  # Source SHAs derived from the `(cherry picked from commit X)` footer that
+  # `git cherry-pick -x` records in +range+. When the footer references a merge
+  # commit (PRs merged with "Create a merge commit", picked with `-m 1`), also
+  # include the individual PR commits the merge introduced, so that a pull
+  # request is recognized no matter which of its commits the footer names.
+  def cherry_picked_shas(range)
+    log = `git log --format=%B #{range}`
+    shas = Set.new
+    log.scan(/cherry picked from commit ([0-9a-f]+)/).flatten.each do |sha|
+      shas << sha
+      parents = git_quietly("rev-list", "--parents", "-n", "1", sha).strip.split.drop(1)
+      next unless parents.size >= 2
+      shas.merge(`git log --format=%H #{parents[0]}..#{parents[1]}`.split("\n"))
+    end
+    shas
   end
 end
