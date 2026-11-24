@@ -133,6 +133,52 @@ class ReleaseTest < Test::Unit::TestCase
     assert_include error.message, "no-such-ref-for-a-test"
   end
 
+  def test_unreleased_pull_requests_keeps_one_cherry_picked_onto_the_stable_branch_ahead_of_the_release
+    in_a_repo_with_two_commits do |first, second|
+      cut_stable_branch(first, "v4.1.0")
+      git("commit", "--allow-empty", "-m", "fix\n\n(cherry picked from commit #{second})")
+      publish_stable_branch
+
+      patch = Release.new("4.1.1")
+      pull = merged_pull_request(1, second)
+
+      with_listings(patch, "master" => [pull]) do
+        assert_equal [1], patch.send(:unreleased_pull_requests).map(&:number)
+      end
+      assert patch.send(:already_on_stable_branch?, pull)
+    end
+  end
+
+  def test_unreleased_pull_requests_leaves_out_one_an_earlier_release_shipped
+    in_a_repo_with_two_commits do |first, second|
+      cut_stable_branch(first, "v4.1.0")
+      git("commit", "--allow-empty", "-m", "fix\n\n(cherry picked from commit #{second})")
+      git("tag", "v4.1.1")
+      publish_stable_branch
+
+      patch = Release.new("4.1.2")
+
+      with_listings(patch, "master" => [merged_pull_request(1, second)]) do
+        assert_empty patch.send(:unreleased_pull_requests)
+      end
+    end
+  end
+
+  def test_unreleased_pull_requests_credits_a_labelled_backport_instead_of_the_pull_request_it_picked
+    in_a_repo_with_two_commits do |first, second|
+      cut_stable_branch(first, "v4.1.0")
+      git("commit", "--allow-empty", "-m", "fix: 4.1.x\n\n(cherry picked from commit #{second})")
+      backport = merged_pull_request(2, `git rev-parse HEAD`.strip)
+      publish_stable_branch
+
+      patch = Release.new("4.1.1")
+
+      with_listings(patch, "master" => [merged_pull_request(1, second)], "4.1" => [backport]) do
+        assert_equal [2], patch.send(:unreleased_pull_requests).map(&:number)
+      end
+    end
+  end
+
   def test_create_for_github_attaches_every_package_the_release_builds
     client = FakeGithubClient.new
     release.instance_variable_set(:@gh_client, client)
@@ -167,6 +213,25 @@ class ReleaseTest < Test::Unit::TestCase
         yield first, `git rev-parse HEAD`.strip
       end
     end
+  end
+
+  def cut_stable_branch(from, tag)
+    git("checkout", "-b", "4.1", from)
+    git("commit", "--allow-empty", "-m", "release")
+    git("tag", tag)
+  end
+
+  # Patch releases read the stable branch from its remote-tracking ref.
+  def publish_stable_branch
+    git("update-ref", "refs/remotes/origin/4.1", "HEAD")
+  end
+
+  def merged_pull_request(number, merge_commit)
+    release.send(:pull_requests_from, listing([record("number" => number, "mergeCommit" => { "oid" => merge_commit })]), "test").first
+  end
+
+  def with_listings(patch, listings, &block)
+    patch.stub(:pull_requests_merged_into, ->(base, *) { listings.fetch(base, []) }, &block)
   end
 
   def git(*args)
