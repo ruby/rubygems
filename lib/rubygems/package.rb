@@ -513,6 +513,10 @@ EOM
 
   def extract_tar_gz(io, destination_dir, pattern = "*") # :nodoc:
     destination_dir = File.realpath(destination_dir)
+    # File.umask sets the process umask to 0 while reading it, so read it once
+    # instead of per file to keep other threads' files from being created
+    # world-writable.
+    umask = File.umask
 
     directories = []
     symlinks = []
@@ -563,7 +567,7 @@ EOM
             # in the IO buffer that needs to be written, and that could be
             # written after the chmod (on close) which would mess up the perms
             out.flush
-            out.chmod file_mode(entry.header.mode) & ~File.umask
+            out.chmod file_mode(entry.header.mode) & ~umask
           end
         end
 
