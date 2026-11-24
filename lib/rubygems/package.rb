@@ -577,7 +577,8 @@ EOM
       real_destination = begin
         File.realpath(target, File.dirname(destination))
       rescue SystemCallError
-        alert_warning "#{@spec.full_name} ships with a dangling symlink named #{name} pointing to missing #{target} file. Ignoring"
+        gem_name = @spec ? @spec.full_name : "unknown"
+        alert_warning "#{gem_name} ships with a dangling symlink named #{name} pointing to missing #{target} file. Ignoring"
         next
       end
 
