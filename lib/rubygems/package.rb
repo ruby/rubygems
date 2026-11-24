@@ -575,7 +575,7 @@ EOM
       # The check above expands ".." lexically, so a target that walks
       # through another symlink in the gem is only known once resolved.
       real_destination = begin
-        File.realpath(target, File.dirname(destination))
+        resolve_symlink_target(target, File.dirname(destination))
       rescue SystemCallError
         gem_name = @spec ? @spec.full_name : "unknown"
         alert_warning "#{gem_name} ships with a dangling symlink named #{name} pointing to missing #{target} file. Ignoring"
@@ -861,6 +861,23 @@ EOM
               normalize_path(real_dir).start_with?(normalize_path(destination_dir + "/"))
 
     raise Gem::Package::PathError.new(real_dir, destination_dir)
+  end
+
+  ##
+  # Resolves the symlink +target+ against +dir+ one component at a time.
+  # TruffleRuby's File.realpath folds ".." before following symlinks, so
+  # ".." is applied here to the already resolved path instead.
+
+  def resolve_symlink_target(target, dir) # :nodoc:
+    root = target[%r{\A(?:[A-Za-z]:)?/}] if target.start_with?("/") || File.absolute_path?(target)
+
+    target.delete_prefix(root.to_s).split("/").inject(File.realpath(File.expand_path(root || dir))) do |current, name|
+      case name
+      when "", "." then current
+      when ".." then File.dirname(current)
+      else File.realpath(name, current)
+      end
+    end
   end
 
   ##
