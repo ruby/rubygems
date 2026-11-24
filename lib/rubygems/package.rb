@@ -865,8 +865,8 @@ EOM
 
   ##
   # Resolves the symlink +target+ against +dir+ one component at a time.
-  # TruffleRuby's File.realpath folds ".." before following symlinks, so
-  # ".." is applied here to the already resolved path instead.
+  # File.realpath on JRuby and TruffleRuby folds ".." before following
+  # symlinks, so ".." is applied here to the already resolved path instead.
 
   def resolve_symlink_target(target, dir) # :nodoc:
     root = target[%r{\A(?:[A-Za-z]:)?/}] if target.start_with?("/") || File.absolute_path?(target)
