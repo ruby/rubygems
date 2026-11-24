@@ -1211,6 +1211,56 @@ class TestGemPackage < Gem::Package::TarTestCase
     assert_path_not_exist File.join(destination_subdir, "lib/link")
   end
 
+  def test_extract_symlink_parent_through_another_symlink
+    omit "Symlinks not supported or not enabled" unless symlink_supported?
+
+    package = Gem::Package.new @gem
+
+    tgz_io = util_tar_gz do |tar|
+      tar.mkdir       "d1/d2/d3/d4/d5", 0o755
+      tar.add_file    "d1/target_name", 0o644 do |io|
+        io.write "inside"
+      end
+      tar.add_symlink "d1/d2/d3/d4/d5/s1", "../../../..", 0o644
+      tar.add_symlink "d1/d2/d3/d4/d5/s2", "s1/../../../../../target_name", 0o644
+    end
+
+    destination_subdir = File.join @destination, "a/b/c/unpack"
+    FileUtils.mkdir_p destination_subdir
+    outside = File.join @destination, "target_name"
+    File.write outside, "outside"
+
+    e = assert_raise(Gem::Package::SymlinkError) do
+      package.extract_tar_gz tgz_io, destination_subdir
+    end
+
+    assert_equal("installing symlink 'd1/d2/d3/d4/d5/s2' pointing to parent path #{File.realpath(outside)} of " \
+                "#{File.realpath(destination_subdir)} is not allowed", e.message)
+
+    assert_path_not_exist File.join(destination_subdir, "d1/d2/d3/d4/d5/s2")
+  end
+
+  def test_extract_tar_gz_symlink_through_another_symlink
+    omit "Symlinks not supported or not enabled" unless symlink_supported?
+
+    package = Gem::Package.new @gem
+
+    tgz_io = util_tar_gz do |tar|
+      tar.mkdir       "lib/sub", 0o755
+      tar.add_file    "lib/file.rb", 0o644 do |io|
+        io.write "hi"
+      end
+      tar.add_symlink "lib/sub/up", "..", 0o644
+      tar.add_symlink "lib/sub/foo.rb", "up/file.rb", 0o644
+    end
+
+    package.extract_tar_gz tgz_io, @destination
+
+    extracted = File.join @destination, "lib/sub/foo.rb"
+    assert_equal "up/file.rb", File.readlink(extracted)
+    assert_equal "hi", File.read(extracted)
+  end
+
   def test_extract_symlink_parent_doesnt_delete_user_dir
     package = Gem::Package.new @gem
 

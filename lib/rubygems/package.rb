@@ -536,7 +536,7 @@ EOM
           raise Gem::Package::SymlinkError.new(full_name, real_destination, destination_dir) unless
             normalize_path(real_destination).start_with? normalize_path(destination_dir + "/")
 
-          symlinks << [full_name, link_target, destination, real_destination]
+          symlinks << [full_name, link_target, destination]
         end
 
         mkdir =
@@ -571,12 +571,20 @@ EOM
       end
     end
 
-    symlinks.each do |name, target, destination, real_destination|
-      if File.exist?(real_destination)
-        create_symlink(target, destination)
-      else
+    symlinks.each do |name, target, destination|
+      # The check above expands ".." lexically, so a target that walks
+      # through another symlink in the gem is only known once resolved.
+      real_destination = begin
+        File.realpath(target, File.dirname(destination))
+      rescue SystemCallError
         alert_warning "#{@spec.full_name} ships with a dangling symlink named #{name} pointing to missing #{target} file. Ignoring"
+        next
       end
+
+      raise Gem::Package::SymlinkError.new(name, real_destination, destination_dir) unless
+        normalize_path(real_destination).start_with? normalize_path(destination_dir + "/")
+
+      create_symlink(target, destination)
     end
 
     if dir_mode && !directories.empty?
