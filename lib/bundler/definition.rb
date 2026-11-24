@@ -870,7 +870,7 @@ module Bundler
       return unless Bundler.frozen_bundle? && @locked_checksums
 
       unchecksummed_specs = specs.select do |spec|
-        (spec.is_a?(EndpointSpecification) || spec.is_a?(RemoteSpecification)) &&
+        !spec.is_a?(StubSpecification) &&
           !Gem::ContentAddress.content_addressed?(spec, validate_ruby_abi: false) &&
           resolve[spec.name].any? {|locked_spec| locked_spec.content_addresses.any? } &&
           !spec.source.checksum_store.locked?(spec)
