@@ -60,9 +60,9 @@ Lock the gems specified in Gemfile.
 * `--add-checksums`:
   Add checksums to the lockfile. Checksums are taken from the source's index,
   or computed from the `.gem` file of a gem installed on this machine. With a
-  source that does not publish checksums, entries for other gems, such as gems
-  for other platforms or content-addressed gems for other Ruby ABIs, stay
-  empty, and frozen installs reject them.
+  source that does not publish checksums, entries for gems not installed here,
+  such as gems for other platforms or content-addressed gems for other Ruby
+  ABIs, stay empty, and frozen installs reject them.
 
 * `--add-platform=<list>`:
   Add a new platform to the lockfile, re-resolving for the addition of that
