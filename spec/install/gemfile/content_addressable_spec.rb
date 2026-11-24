@@ -709,6 +709,73 @@ RSpec.describe "bundle install with content-addressable gems", :compact_index, r
       expect(lockfile).to eq(original_lockfile)
     end
   end
+
+  context "when the lockfile has checksums but a content-addressed row has no digest" do
+    before do
+      build_repo2_with_content_addressed_gems(platform_gem: false)
+
+      gemfile <<~G
+        source "https://gem.repo2"
+
+        gem "mygem"
+      G
+    end
+
+    [:current_address, :mismatched_address].each do |digestless|
+      it "refuses a frozen install when the row for #{digestless == :current_address ? "the running" : "another"} Ruby ABI has no digest" do
+        simulate_platform "x86_64-linux" do
+          lockfile_with_content_addresses(addresses(current_abi, mismatched_abi), platform_gem: false, checksums: true, without_digests: [send(digestless)], ruby_abis: [current_abi, mismatched_abi].sort)
+
+          bundle_config "frozen true"
+          bundle_with_content_addressed_gems "install", raise_on_error: false
+
+          expect(err).to include("Your lockfile has an empty CHECKSUMS entry for \"mygem\", but can't be updated because frozen mode is set")
+          expect(out).not_to include("Installing mygem")
+        end
+      end
+    end
+
+    it "fills the digest of every content-addressed row when not frozen" do
+      simulate_platform "x86_64-linux" do
+        lockfile_with_content_addresses(addresses(current_abi, mismatched_abi), platform_gem: false, checksums: true, without_digests: [mismatched_address], ruby_abis: [current_abi, mismatched_abi].sort)
+
+        bundle_with_content_addressed_gems "install"
+
+        expect(the_bundle).to include_gems "mygem 1.0 content_addressed"
+        addresses(current_abi, mismatched_abi).each do |address, ruby_abi|
+          expect(lockfile).to include("#{address} abi=#{ruby_abi} sha256=#{checksum_digest(gem_repo2, "mygem", "1.0", address)}\n")
+        end
+      end
+    end
+
+    it "fills the digest of every content-addressed row with `bundle lock --add-checksums`" do
+      simulate_platform "x86_64-linux" do
+        lockfile_with_content_addresses(addresses(current_abi, mismatched_abi), platform_gem: false, checksums: true, without_digests: [current_address, mismatched_address], ruby_abis: [current_abi, mismatched_abi].sort)
+
+        bundle_with_content_addressed_gems "lock --add-checksums"
+
+        addresses(current_abi, mismatched_abi).each do |address, ruby_abi|
+          expect(lockfile).to include("#{address} abi=#{ruby_abi} sha256=#{checksum_digest(gem_repo2, "mygem", "1.0", address)}\n")
+        end
+      end
+    end
+
+    it "does not resolve again on every `Bundler.setup` while offline" do
+      simulate_platform "x86_64-linux" do
+        lockfile_with_content_addresses(addresses(current_abi), platform_gem: false, checksums: true, ruby_abis: [current_abi])
+        bundle_with_content_addressed_gems "install"
+
+        lockfile_with_content_addresses(addresses(current_abi), platform_gem: false, checksums: true, without_digests: [current_address], ruby_abis: [current_abi])
+        original_lockfile = lockfile
+
+        2.times do
+          ruby "require 'bundler'; Bundler.setup"
+          expect(out).not_to include("Resolving dependencies...")
+        end
+        expect(lockfile).to eq(original_lockfile)
+      end
+    end
+  end
 end
 
 RSpec.describe "bundle install with content-addressable gems invisible to pre-4.1 RubyGems clients", :compact_index, rubygems: ">= 4.1.0.a" do
