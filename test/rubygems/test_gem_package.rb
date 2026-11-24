@@ -1079,6 +1079,28 @@ class TestGemPackage < Gem::Package::TarTestCase
     refute File.exist?(escaped), "must not write outside extraction root via symlink"
   end
 
+  def test_extract_tar_gz_rejects_preexisting_symlink_escape_without_creating_directory
+    omit "Symlinks not supported or not enabled" unless symlink_supported?
+
+    package = Gem::Package.new @gem
+
+    tgz_io = util_tar_gz do |tar|
+      tar.mkdir "lib/sub", 0o755
+    end
+
+    escape_dir = File.join(@tempdir, "escape")
+    FileUtils.mkdir_p escape_dir
+
+    FileUtils.rm_rf File.join(@destination, "lib")
+    File.symlink escape_dir, File.join(@destination, "lib")
+
+    assert_raise Gem::Package::PathError do
+      package.extract_tar_gz tgz_io, @destination
+    end
+
+    assert_path_not_exist File.join(escape_dir, "sub")
+  end
+
   def test_extract_tar_gz_rejects_preexisting_leaf_symlink
     omit "Symlinks not supported or not enabled" unless symlink_supported?
 
