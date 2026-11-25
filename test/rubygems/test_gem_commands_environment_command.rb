@@ -130,6 +130,52 @@ class TestGemCommandsEnvironmentCommand < Gem::TestCase
     Gem.sources.replace orig_sources
   end
 
+  def test_execute_remotesources_redacts_credentials
+    orig_sources = Gem.sources.dup
+    Gem.sources.replace %w[http://u:secret@gems.example.com https://secret-token@gems.example.com]
+
+    @cmd.send :handle_options, %w[remotesources]
+
+    use_ui @ui do
+      @cmd.execute
+    end
+
+    expected = <<-EOF
+http://u:REDACTED@gems.example.com
+https://REDACTED@gems.example.com
+    EOF
+
+    assert_equal expected, @ui.output
+    assert_equal "", @ui.error
+  ensure
+    Gem.sources.replace orig_sources
+  end
+
+  def test_execute_redacts_credentials
+    orig_sources = Gem.sources.dup
+    orig_config_sources = Gem.configuration[:sources]
+    orig_http_proxy = Gem.configuration[:http_proxy]
+    Gem.sources.replace %w[http://u:secret@gems.example.com]
+    Gem.configuration[:sources] = %w[http://u:secret@gems.example.com]
+    Gem.configuration[:http_proxy] = "http://proxy-user:secret@proxy.example.com"
+
+    @cmd.send :handle_options, %w[]
+
+    use_ui @ui do
+      @cmd.execute
+    end
+
+    assert_includes @ui.output, ':sources => ["http://u:REDACTED@gems.example.com"]'
+    assert_includes @ui.output, ':http_proxy => "http://proxy-user:REDACTED@proxy.example.com"'
+    assert_includes @ui.output, "REMOTE SOURCES:\n     - http://u:REDACTED@gems.example.com\n"
+    refute_match(/secret/, @ui.output)
+    assert_empty @ui.error
+  ensure
+    Gem.sources.replace orig_sources
+    Gem.configuration[:sources] = orig_config_sources
+    Gem.configuration[:http_proxy] = orig_http_proxy
+  end
+
   def test_execute_unknown
     @cmd.send :handle_options, %w[unknown]
 

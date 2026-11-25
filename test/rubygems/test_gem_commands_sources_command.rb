@@ -335,6 +335,69 @@ Error fetching http://beta-gems.example.com:
     assert_equal "", @ui.error
   end
 
+  def test_execute_add_redacts_credentials
+    uri = "http://u:secret@beta-gems.example.com"
+
+    setup_fake_source(uri)
+
+    @cmd.handle_options %W[--add #{uri}]
+
+    use_ui @ui do
+      @cmd.execute
+    end
+
+    assert_equal [@gem_repo, uri], Gem.sources
+
+    expected = <<-EOF
+http://u:REDACTED@beta-gems.example.com added to sources
+    EOF
+
+    assert_equal expected, @ui.output
+    assert_equal "", @ui.error
+  end
+
+  def test_execute_add_typo_squatting_source_redacts_credentials
+    uri = "https://u:secret@rubyems.org"
+
+    setup_fake_source(uri)
+
+    @cmd.handle_options %W[--add #{uri}]
+
+    ui = Gem::MockGemUi.new("n")
+
+    use_ui ui do
+      assert_raise Gem::MockGemUi::TermError do
+        @cmd.execute
+      end
+    end
+
+    expected = "https://u:REDACTED@rubyems.org is too similar to https://rubygems.org\n\nDo you want to add this source? [yn]  "
+
+    assert_equal expected, ui.output
+    assert_empty ui.error
+  end
+
+  def test_execute_add_http_rubygems_org_redacts_credentials
+    uri = "http://u:secret@rubygems.org/"
+
+    setup_fake_source(uri)
+
+    @cmd.handle_options %W[--add #{uri}]
+
+    ui = Gem::MockGemUi.new("n")
+
+    use_ui ui do
+      assert_raise Gem::MockGemUi::TermError do
+        @cmd.execute
+      end
+    end
+
+    expected = "https://rubygems.org is recommended for security over http://u:REDACTED@rubygems.org/\n\nDo you want to add this insecure source? [yn]  "
+
+    assert_equal expected, ui.output
+    assert_empty ui.error
+  end
+
   def test_execute_add_existent_source_invalid_uri
     spec_fetcher
 
@@ -745,6 +808,52 @@ beta-gems.example.com/ is not a URI
     end
 
     expected = "#{@new_repo} removed from sources\n"
+
+    assert_equal expected, @ui.output
+    assert_equal "", @ui.error
+  ensure
+    Gem.configuration.sources = nil
+  end
+
+  def test_execute_list_redacts_credentials
+    Gem.configuration.sources = %w[
+      http://u:secret@beta-gems.example.com
+      https://secret-token@gems.example.com/
+    ]
+
+    @cmd.handle_options %w[--list]
+
+    use_ui @ui do
+      @cmd.execute
+    end
+
+    expected = <<-EOF
+*** CURRENT SOURCES ***
+
+http://u:REDACTED@beta-gems.example.com
+https://REDACTED@gems.example.com/
+    EOF
+
+    assert_equal expected, @ui.output
+    assert_equal "", @ui.error
+  ensure
+    Gem.configuration.sources = nil
+  end
+
+  def test_execute_remove_redacts_credentials
+    uri = "http://u:secret@beta-gems.example.com"
+
+    Gem.configuration.sources = [uri]
+
+    setup_fake_source(uri)
+
+    @cmd.handle_options %W[--remove #{uri}]
+
+    use_ui @ui do
+      @cmd.execute
+    end
+
+    expected = "http://u:REDACTED@beta-gems.example.com removed from sources\n"
 
     assert_equal expected, @ui.output
     assert_equal "", @ui.error

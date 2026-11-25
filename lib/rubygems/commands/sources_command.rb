@@ -51,7 +51,7 @@ class Gem::Commands::SourcesCommand < Gem::Command
 
   def add_source(source_uri) # :nodoc:
     source = build_new_source(source_uri)
-    source_uri = source.uri.to_s
+    source_uri = Gem::Uri.redact(source.uri).to_s
 
     begin
       if Gem.sources.include? source
@@ -74,7 +74,7 @@ class Gem::Commands::SourcesCommand < Gem::Command
 
   def append_source(source_uri) # :nodoc:
     source = build_new_source(source_uri)
-    source_uri = source.uri.to_s
+    source_uri = Gem::Uri.redact(source.uri).to_s
 
     begin
       source.load_specs :released
@@ -98,7 +98,7 @@ class Gem::Commands::SourcesCommand < Gem::Command
 
   def prepend_source(source_uri) # :nodoc:
     source = build_new_source(source_uri)
-    source_uri = source.uri.to_s
+    source_uri = Gem::Uri.redact(source.uri).to_s
 
     begin
       source.load_specs :released
@@ -123,7 +123,7 @@ class Gem::Commands::SourcesCommand < Gem::Command
   def check_typo_squatting(source)
     if source.typo_squatting?("rubygems.org")
       question = <<-QUESTION.chomp
-#{source.uri} is too similar to https://rubygems.org
+#{Gem::Uri.redact(source.uri)} is too similar to https://rubygems.org
 
 Do you want to add this source?
       QUESTION
@@ -151,7 +151,7 @@ Do you want to add this source?
     if uri.scheme && uri.scheme.casecmp("http").zero? &&
        uri.host.casecmp("rubygems.org").zero?
       question = <<-QUESTION.chomp
-https://rubygems.org is recommended for security over #{uri}
+https://rubygems.org is recommended for security over #{Gem::Uri.redact(uri)}
 
 Do you want to add this insecure source?
       QUESTION
@@ -247,7 +247,7 @@ To remove a source use the --remove argument:
     say
 
     list.each do |src|
-      say src
+      say Gem::Uri.redact(src).to_s
     end
   end
 
@@ -278,7 +278,7 @@ To remove a source use the --remove argument:
 
   def remove_source(source_uri) # :nodoc:
     source = build_source(source_uri)
-    source_uri = source.uri.to_s
+    source_uri = Gem::Uri.redact(source.uri).to_s
 
     if configured_sources&.include? source
       Gem.sources.delete source

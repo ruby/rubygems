@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../command"
+require_relative "../uri"
 
 class Gem::Commands::EnvironmentCommand < Gem::Command
   def initialize
@@ -87,7 +88,7 @@ lib/rubygems/defaults/operating_system.rb
       when /^user_gemdir/, /^user_gemhome/ then
         Gem.user_dir
       when /^remotesources/ then
-        Gem.sources.to_a.join("\n")
+        Gem.sources.map {|s| Gem::Uri.redact(s).to_s }.join("\n")
       when /^platform/ then
         Gem.platforms.join(File::PATH_SEPARATOR)
       when /^credentials/, /^creds/ then
@@ -147,12 +148,13 @@ lib/rubygems/defaults/operating_system.rb
     out << "  - GEM CONFIGURATION:\n"
     Gem.configuration.each do |name, value|
       value = value.gsub(/./, "*") if name == "gemcutter_key"
+      value = redact_uris(value) if [:sources, :http_proxy].include?(name)
       out << "     - #{name.inspect} => #{value.inspect}\n"
     end
 
     out << "  - REMOTE SOURCES:\n"
     Gem.sources.each do |s|
-      out << "     - #{s}\n"
+      out << "     - #{Gem::Uri.redact(s)}\n"
     end
 
     out << "  - SHELL PATH:\n"
@@ -164,6 +166,17 @@ lib/rubygems/defaults/operating_system.rb
   end
 
   private
+
+  ##
+  # Redacts credentials in a URI string or an array of URI strings
+
+  def redact_uris(value)
+    case value
+    when Array then value.map {|v| redact_uris(v) }
+    when String then Gem::Uri.redact(value).to_s
+    else value
+    end
+  end
 
   ##
   # Git binary path
