@@ -89,6 +89,7 @@ RSpec.describe "Resolving" do
       gem "bb", "1.0.0.rc1"
       gem("bb", "1.0.0") { dep "cc", ">= 2.0" }
       gem "cc", "1.0.0"
+      gem "RubyGems\0", Gem::VERSION
     end
 
     dep "aa"
@@ -105,6 +106,7 @@ RSpec.describe "Resolving" do
       gem("bb", "1.0.0") { dep "cc", ">= 2.0" }
       gem "bb", "1.0.1"
       gem "cc", %w[1.0.0 2.0.0]
+      gem "RubyGems\0", Gem::VERSION
     end
 
     dep "aa"
