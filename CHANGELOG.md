@@ -2,6 +2,29 @@
 
 Bundler's changelog before 4.0.0, when it was versioned separately from RubyGems, is in [doc/CHANGELOG-bundler-2.x.md](https://github.com/ruby/rubygems/blob/master/doc/CHANGELOG-bundler-2.x.md).
 
+## 4.0.25 / 2026-11-25
+
+### RubyGems
+
+#### Bug fixes:
+
+* Fix file permissions during gem extraction. Pull request [#10128](https://github.com/ruby/rubygems/pull/10128) by Hiroshi SHIBATA
+* Resolve chained symlink targets before creating them during extraction. Pull request [#10119](https://github.com/ruby/rubygems/pull/10119) by Hiroshi SHIBATA
+* Forward keyword arguments in the IPv4 fallback TCPSocket#initialize. Pull request [#10098](https://github.com/ruby/rubygems/pull/10098) by Hiroshi SHIBATA
+
+### Bundler
+
+#### Bug fixes:
+
+* Retry resolution with transitive prereleases. Pull request [#10110](https://github.com/ruby/rubygems/pull/10110) by Hiroshi SHIBATA
+* Allow full updates to downgrade a yanked gem. Pull request [#10106](https://github.com/ruby/rubygems/pull/10106) by Hiroshi SHIBATA
+* Allow `bundle lock --add-platform` to add native platforms from JRuby. Pull request [#10105](https://github.com/ruby/rubygems/pull/10105) by Hiroshi SHIBATA
+* Show fourth-segment and prerelease updates in `bundle outdated --filter-patch`. Pull request [#10103](https://github.com/ruby/rubygems/pull/10103) by Hiroshi SHIBATA
+* Resolve dependencies before `bundle add` updates the Gemfile. Pull request [#10101](https://github.com/ruby/rubygems/pull/10101) by Hiroshi SHIBATA
+* Read plugin index files that Bundler 4.1 writes. Pull request [#10077](https://github.com/ruby/rubygems/pull/10077) by Hiroshi SHIBATA
+* Preload git sources that share a cache one after another: 4.0.x. Pull request [#10069](https://github.com/ruby/rubygems/pull/10069) by Hiroshi SHIBATA
+* Fix Bundler mirror probing with `fallback_timeout`. Pull request [#10046](https://github.com/ruby/rubygems/pull/10046) by Hiroshi SHIBATA
+
 ## 4.1.1 / 2026-11-25
 
 ### RubyGems
