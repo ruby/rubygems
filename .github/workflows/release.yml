@@ -77,7 +77,9 @@ jobs:
         env:
           RUBYOPT: -r${{ runner.temp }}/rubygems-attestation-patch.rb
       - name: Wait for the gems to be available
-        run: gem exec rubygems-await pkg/*.gem
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/await-release.rb" https://raw.githubusercontent.com/rubygems/release-gem/2654a0fe0dc39725c07fe84d7fe863a084f2424e/await-release.rb
+          ruby "$RUNNER_TEMP/await-release.rb" pkg/*.gem
 
   github_release:
     name: Create GitHub release
