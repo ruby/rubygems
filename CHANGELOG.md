@@ -2,6 +2,52 @@
 
 Bundler's changelog before 4.0.0, when it was versioned separately from RubyGems, is in [doc/CHANGELOG-bundler-2.x.md](https://github.com/ruby/rubygems/blob/master/doc/CHANGELOG-bundler-2.x.md).
 
+## 4.1.1 / 2026-11-25
+
+### RubyGems
+
+#### Enhancements:
+
+* Installs bundler 4.1.1 as a default gem.
+
+#### Bug fixes:
+
+* Fix file permissions during gem extraction. Pull request [#10128](https://github.com/ruby/rubygems/pull/10128) by Hiroshi SHIBATA
+* Resolve chained symlink targets before creating them during extraction. Pull request [#10119](https://github.com/ruby/rubygems/pull/10119) by Hiroshi SHIBATA
+* Keep negative any terms when PubGrub resolves conflicts. Pull request [#10112](https://github.com/ruby/rubygems/pull/10112) by Hiroshi SHIBATA
+* Serialize concurrent installs of the same gem. Pull request [#10107](https://github.com/ruby/rubygems/pull/10107) by Hiroshi SHIBATA
+* Keep resolved prereleases when sorting install requests. Pull request [#10100](https://github.com/ruby/rubygems/pull/10100) by Hiroshi SHIBATA
+* Forward keyword arguments in the IPv4 fallback TCPSocket#initialize. Pull request [#10098](https://github.com/ruby/rubygems/pull/10098) by Hiroshi SHIBATA
+* Push attestations with non-ASCII bytes on Ruby 3.2 and 3.3. Pull request [#10097](https://github.com/ruby/rubygems/pull/10097) by Hiroshi SHIBATA
+* Gem::YAMLSerializer::Parser only reads the first document of a YAML stream. Pull request [#10088](https://github.com/ruby/rubygems/pull/10088) by Ben Sheldon and Hiroshi SHIBATA
+
+### Bundler
+
+#### Bug fixes:
+
+* Assign the specs missing from the shard list to shard_d. Pull request [#10127](https://github.com/ruby/rubygems/pull/10127) by Hiroshi SHIBATA
+* Require a digest on every content-addressed row of a checksummed lockfile. Pull request [#10122](https://github.com/ruby/rubygems/pull/10122) by Hiroshi SHIBATA
+* Keep frozen installs to gems the lockfile covers for content-addressed rows. Pull request [#10120](https://github.com/ruby/rubygems/pull/10120) by Hiroshi SHIBATA
+* Stop shipping the URI and YAML serializer entry files in the Bundler gem. Pull request [#10113](https://github.com/ruby/rubygems/pull/10113) by Hiroshi SHIBATA
+* Keep negative any terms when PubGrub resolves conflicts. Pull request [#10112](https://github.com/ruby/rubygems/pull/10112) by Hiroshi SHIBATA
+* Check gem requirements when locking from legacy indexes. Pull request [#10111](https://github.com/ruby/rubygems/pull/10111) by Hiroshi SHIBATA
+* Retry resolution with transitive prereleases. Pull request [#10110](https://github.com/ruby/rubygems/pull/10110) by Hiroshi SHIBATA
+* Explain activation conflicts caused by a Gemfile require. Pull request [#10109](https://github.com/ruby/rubygems/pull/10109) by Hiroshi SHIBATA
+* Allow full updates to downgrade a yanked gem. Pull request [#10106](https://github.com/ruby/rubygems/pull/10106) by Hiroshi SHIBATA
+* Honor `--prefer-local` when locking platform variants. Pull request [#10108](https://github.com/ruby/rubygems/pull/10108) by Hiroshi SHIBATA
+* Honor `--jobs` when installing from `vendor/cache`. Pull request [#10102](https://github.com/ruby/rubygems/pull/10102) by Hiroshi SHIBATA
+* Allow `bundle lock --add-platform` to add native platforms from JRuby. Pull request [#10105](https://github.com/ruby/rubygems/pull/10105) by Hiroshi SHIBATA
+* Show fourth-segment and prerelease updates in `bundle outdated --filter-patch`. Pull request [#10103](https://github.com/ruby/rubygems/pull/10103) by Hiroshi SHIBATA
+* Preserve inline settings after a forked install. Pull request [#10099](https://github.com/ruby/rubygems/pull/10099) by Hiroshi SHIBATA
+* Resolve dependencies before `bundle add` updates the Gemfile. Pull request [#10101](https://github.com/ruby/rubygems/pull/10101) by Hiroshi SHIBATA
+* Keep mirror settings readable by Bundler 4.0. Pull request [#10075](https://github.com/ruby/rubygems/pull/10075) by Paul Wille
+* Fix Gem::URI redefinition warnings on older RubyGems. Pull request [#10074](https://github.com/ruby/rubygems/pull/10074) by Paul Wille and Hiroshi SHIBATA
+* Read plugin index sections that are not hashes as empty. Pull request [#10076](https://github.com/ruby/rubygems/pull/10076) by Hiroshi SHIBATA
+
+#### Documentation:
+
+* Document that bundle lock --add-checksums leaves entries for uninstalled gems empty. Pull request [#10121](https://github.com/ruby/rubygems/pull/10121) by Hiroshi SHIBATA
+
 ## 4.1.0 / 2026-11-16
 
 ### RubyGems
