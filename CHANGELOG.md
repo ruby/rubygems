@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.0.25 / 2026-11-25
+
+### Bug fixes:
+
+* Fix file permissions during gem extraction. Pull request [#10128](https://github.com/ruby/rubygems/pull/10128) by Hiroshi SHIBATA
+* Resolve chained symlink targets before creating them during extraction. Pull request [#10119](https://github.com/ruby/rubygems/pull/10119) by Hiroshi SHIBATA
+* Forward keyword arguments in the IPv4 fallback TCPSocket#initialize. Pull request [#10098](https://github.com/ruby/rubygems/pull/10098) by Hiroshi SHIBATA
+
 ## 4.0.24 / 2026-11-05
 
 ### Enhancements:
