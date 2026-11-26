@@ -17,6 +17,10 @@ class TestGemResolver < Gem::TestCase
     StaticSet.new(specs)
   end
 
+  def fetched_gemspecs
+    @fetcher.paths.grep(/\.gemspec\.rz\z/).map {|path| File.basename(path, ".gemspec.rz") }.uniq.sort
+  end
+
   def assert_resolves_to(expected, resolver)
     actual = resolver.resolve
 
@@ -237,6 +241,101 @@ class TestGemResolver < Gem::TestCase
     end
 
     refute_empty e.errors
+  end
+
+  def test_resolve_index_set_fetches_only_selected_gemspecs
+    spec_fetcher do |fetcher|
+      %w[1 2 3 4].each do |version|
+        fetcher.spec "a", version do |s|
+          s.add_dependency "b", ">= 1"
+        end
+      end
+      fetcher.spec "b", 1
+      fetcher.spec "b", 2
+    end
+
+    res = Gem::Resolver.new [make_dep("a", "= 2")], Gem::Resolver::IndexSet.new
+
+    assert_equal %w[a-2 b-2], res.resolve.map(&:full_name).sort
+    assert_equal %w[a-2 b-2], fetched_gemspecs
+  end
+
+  def test_resolve_index_set_without_requirement_fetches_only_selected_gemspecs
+    spec_fetcher do |fetcher|
+      %w[1 2 3 4].each do |version|
+        fetcher.spec "a", version do |s|
+          s.add_dependency "b", ">= 1"
+        end
+      end
+      fetcher.spec "b", 1
+      fetcher.spec "b", 2
+    end
+
+    res = Gem::Resolver.new [make_dep("a")], Gem::Resolver::IndexSet.new
+
+    assert_equal %w[a-4 b-2], res.resolve.map(&:full_name).sort
+    assert_equal %w[a-4 b-2], fetched_gemspecs
+  end
+
+  def test_resolve_index_set_skips_version_with_unmet_ruby_version
+    spec_fetcher do |fetcher|
+      fetcher.spec "a", 1
+      fetcher.spec "a", 2
+      fetcher.spec "a", 3 do |s|
+        s.required_ruby_version = ">= 999.0"
+      end
+    end
+
+    res = Gem::Resolver.new [make_dep("a")], Gem::Resolver::IndexSet.new
+
+    assert_equal %w[a-2], res.resolve.map(&:full_name)
+    assert_equal %w[a-2 a-3], fetched_gemspecs
+  end
+
+  def test_resolve_index_set_skips_dependency_version_with_unmet_rubygems_version
+    spec_fetcher do |fetcher|
+      fetcher.spec "a", 1 do |s|
+        s.add_dependency "b", ">= 1"
+      end
+      fetcher.spec "b", 1
+      fetcher.spec "b", 2 do |s|
+        s.required_rubygems_version = ">= 999.0"
+      end
+    end
+
+    res = Gem::Resolver.new [make_dep("a")], Gem::Resolver::IndexSet.new
+
+    assert_equal %w[a-1 b-1], res.resolve.map(&:full_name).sort
+  end
+
+  def test_resolve_index_set_names_ruby_requirement_when_no_version_fits
+    spec_fetcher do |fetcher|
+      fetcher.spec "a", 1 do |s|
+        s.required_ruby_version = ">= 999.0"
+      end
+    end
+
+    res = Gem::Resolver.new [make_dep("a", "= 1")], Gem::Resolver::IndexSet.new
+
+    e = assert_raise Gem::DependencyResolutionError do
+      res.resolve
+    end
+
+    assert_match(/requires Ruby >= 999.0/, e.message)
+  end
+
+  def test_resolve_index_set_soft_missing_keeps_version_with_unmet_ruby_version
+    spec_fetcher do |fetcher|
+      fetcher.spec "a", 1
+      fetcher.spec "a", 2 do |s|
+        s.required_ruby_version = ">= 999.0"
+      end
+    end
+
+    res = Gem::Resolver.new [make_dep("a")], Gem::Resolver::IndexSet.new
+    res.soft_missing = true
+
+    assert_equal %w[a-2], res.resolve.map(&:full_name)
   end
 
   def test_no_overlap_specifically

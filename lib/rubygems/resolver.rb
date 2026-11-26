@@ -120,21 +120,8 @@ class Gem::Resolver
     @packages = {}
 
     @unfiltered_specs = Hash.new {|h, name| h[name] = find_unfiltered_specs_for(name) }
-    @all_specs = Hash.new {|h, name| h[name] = filter_specs(@unfiltered_specs[name]) }
-    @all_versions = Hash.new {|h, pkg| h[pkg] = @all_specs[pkg.to_s].map(&:version).uniq.sort }
-    @sorted_versions = Hash.new do |h, pkg|
-      h[pkg] = Gem::PubGrub::Package.root?(pkg) ? [@root_version] : @all_versions[pkg]
-    end
-    @cached_dependencies = Hash.new do |h, pkg|
-      h[pkg] = if Gem::PubGrub::Package.root?(pkg)
-        { @root_version => root_dependencies }
-      else
-        Hash.new {|v, ver| v[ver] = compute_dependencies(pkg, ver) }
-      end
-    end
-    @version_to_index = Hash.new {|h, pkg| h[pkg] = @sorted_versions[pkg].each_with_index.to_h }
-    @versions_for_cache = Hash.new {|h, pkg| h[pkg] = {} }
-    @spec_for_cache = Hash.new {|h, name| h[name] = build_spec_for_cache(name) }
+    @unmet_metadata_specs = []
+    reset_caches
   end
 
   ##
@@ -162,13 +149,7 @@ class Gem::Resolver
       raise exc
     end
 
-    solver = Gem::PubGrub::VersionSolver.new(
-      source: self,
-      root: @root_package,
-      strategy: Gem::Resolver::Strategy.new(self),
-      logger: make_logger
-    )
-    result = solver.solve
+    result = solve
 
     # Convert to Array<ActivationRequest>
     needed_by_name = @needed.group_by(&:name)
@@ -279,6 +260,7 @@ class Gem::Resolver
 
       # find version low such that all >= low share the same dep
       while low > 0 &&
+            dependencies_loaded?(package, sorted_versions[low - 1]) &&
             package_deps[sorted_versions[low - 1]][dep_package_name] == dep_constraint
         low -= 1
       end
@@ -291,6 +273,7 @@ class Gem::Resolver
 
       # find version high such that all < high share the same dep
       while high < sorted_versions.length &&
+            dependencies_loaded?(package, sorted_versions[high]) &&
             package_deps[sorted_versions[high]][dep_package_name] == dep_constraint
         high += 1
       end
@@ -350,6 +333,51 @@ class Gem::Resolver
 
   private
 
+  def reset_caches
+    @all_specs = Hash.new {|h, name| h[name] = filter_specs(@unfiltered_specs[name]) }
+    @all_versions = Hash.new {|h, pkg| h[pkg] = @all_specs[pkg.to_s].map(&:version).uniq.sort }
+    @sorted_versions = Hash.new do |h, pkg|
+      h[pkg] = Gem::PubGrub::Package.root?(pkg) ? [@root_version] : @all_versions[pkg]
+    end
+    @cached_dependencies = Hash.new do |h, pkg|
+      h[pkg] = if Gem::PubGrub::Package.root?(pkg)
+        { @root_version => root_dependencies }
+      else
+        Hash.new {|v, ver| v[ver] = compute_dependencies(pkg, ver) }
+      end
+    end
+    @version_to_index = Hash.new {|h, pkg| h[pkg] = @sorted_versions[pkg].each_with_index.to_h }
+    @versions_for_cache = Hash.new {|h, pkg| h[pkg] = {} }
+    @spec_for_cache = Hash.new {|h, name| h[name] = build_spec_for_cache(name) }
+  end
+
+  ##
+  # Runs the solver. Specs from a legacy index reach the solver without a
+  # Ruby and RubyGems requirement check (see #filter_specs), so check the
+  # selected ones here and solve again without those that do not fit.
+
+  def solve
+    loop do
+      solver = Gem::PubGrub::VersionSolver.new(
+        source: self,
+        root: @root_package,
+        strategy: Gem::Resolver::Strategy.new(self),
+        logger: make_logger
+      )
+      result = solver.solve
+
+      unmet = result.filter_map do |package, version|
+        next if Gem::PubGrub::Package.root?(package)
+        spec = spec_for(package.to_s, version)
+        spec if deferred_metadata?(spec) && !metadata_satisfied?(spec)
+      end
+      return result if unmet.empty?
+
+      @unmet_metadata_specs.concat unmet
+      reset_caches
+    end
+  end
+
   def package_for(name)
     @packages[name] ||= Gem::PubGrub::Package.new(name)
   end
@@ -383,9 +411,9 @@ class Gem::Resolver
     filtered = select_local_platforms(specs)
 
     unless @soft_missing
+      filtered -= @unmet_metadata_specs
       filtered = filtered.select do |s|
-        s.required_ruby_version.satisfied_by?(Gem.ruby_version) &&
-          s.required_rubygems_version.satisfied_by?(Gem.rubygems_version)
+        deferred_metadata?(s) || metadata_satisfied?(s)
       rescue StandardError
         true
       end
@@ -394,6 +422,30 @@ class Gem::Resolver
     filtered = filter_cooldown_specs(filtered) if @cooldown&.active?
 
     filtered
+  end
+
+  ##
+  # A legacy index lists only name, version and platform. Reading the Ruby and
+  # RubyGems requirements of such a spec downloads its gemspec, so #solve
+  # checks them for the selected versions and not for every listed version.
+
+  def deferred_metadata?(spec)
+    !@soft_missing && Gem::Resolver::IndexSpecification === spec
+  end
+
+  ##
+  # #incompatibilities_for widens a dependency to the neighbouring versions
+  # that share it. With a legacy index that downloads the gemspec of each
+  # neighbour, so only widen over versions that need no download.
+
+  def dependencies_loaded?(package, version)
+    @cached_dependencies[package].key?(version) ||
+      !(Gem::Resolver::IndexSpecification === spec_for(package.to_s, version))
+  end
+
+  def metadata_satisfied?(spec)
+    spec.required_ruby_version.satisfied_by?(Gem.ruby_version) &&
+      spec.required_rubygems_version.satisfied_by?(Gem.rubygems_version)
   end
 
   ##
