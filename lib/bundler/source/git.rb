@@ -154,7 +154,13 @@ module Bundler
 
         original_path = path
         path = Pathname.new(path)
-        path = path.expand_path(Bundler.root) unless path.relative?
+        begin
+          path = path.expand_path(Bundler.root)
+        rescue ArgumentError => e
+          Bundler.ui.debug(e)
+          raise GitError, "Cannot use local override for #{name} at #{path} because #{e.message}. Run " \
+            "`bundle config unset local.#{override_for(original_path)}` to remove the local override"
+        end
 
         unless branch || Bundler.settings[:disable_local_branch_check]
           raise GitError, "Cannot use local override for #{name} at #{path} because " \
