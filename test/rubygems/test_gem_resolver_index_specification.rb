@@ -47,6 +47,31 @@ class TestGemResolverIndexSpecification < Gem::TestCase
     refute_equal first.hash, second.hash
   end
 
+  def test_installable_platform_eh
+    @fetcher = Gem::FakeFetcher.new
+    Gem::RemoteFetcher.fetcher = @fetcher
+
+    set     = Gem::Resolver::IndexSet.new
+    source  = Gem::Source.new @gem_repo
+    version = Gem::Version.new "3.0.3"
+
+    local = Gem::Resolver::IndexSpecification.new(
+      set, "rails", version, source, Gem::Platform.local
+    )
+    ruby = Gem::Resolver::IndexSpecification.new(
+      set, "rails", version, source, Gem::Platform::RUBY
+    )
+    other = Gem::Resolver::IndexSpecification.new(
+      set, "rails", version, source, "other-cpu-other-os"
+    )
+
+    assert_predicate local, :installable_platform?
+    assert_predicate ruby,  :installable_platform?
+    refute_predicate other, :installable_platform?
+
+    assert_empty @fetcher.paths.grep(/\.gemspec\.rz\z/)
+  end
+
   def test_install
     spec_fetcher do |fetcher|
       fetcher.gem "a", 2
