@@ -19,6 +19,47 @@ RSpec.describe "bundle install with git sources" do
       expect(out).to eq("LOCAL")
     end
 
+    it "resolves a relative local override against the project root from a subdirectory" do
+      local = lib_path("local-myrack")
+      build_git "myrack", "0.8", path: local
+
+      gemfile <<-G
+        source "https://gem.repo1"
+        gem "myrack", :git => "#{lib_path("myrack-0.8")}", :branch => "main"
+      G
+
+      env = { "BUNDLE_LOCAL__MYRACK" => local.relative_path_from(bundled_app).to_s }
+      bundle :install, env: env
+      bundle :check, dir: bundled_app("subdir").mkpath, env: env
+      expect(out).to include("The Gemfile's dependencies are satisfied")
+    end
+
+    it "expands a home-relative local override" do
+      build_git "myrack", "0.8", path: home("local-myrack")
+
+      gemfile <<-G
+        source "https://gem.repo1"
+        gem "myrack", :git => "#{lib_path("myrack-0.8")}", :branch => "main"
+      G
+
+      bundle :install, env: { "BUNDLE_LOCAL__MYRACK" => "~/local-myrack" }
+      expect(out).to include("Bundle complete!")
+    end
+
+    it "reports a Git error for a local override with an unknown home directory" do
+      skip "problems with ~ expansion" if Gem.win_platform?
+
+      gemfile <<-G
+        source "https://gem.repo1"
+        gem "myrack", :git => "#{lib_path("myrack-0.8")}", :branch => "main"
+      G
+
+      path = "~some_unexisting_user/local-myrack"
+      bundle :install, env: { "BUNDLE_LOCAL__MYRACK" => path }, raise_on_error: false
+      expect(exitstatus).to eq(11)
+      expect(err).to include("Cannot use local override", path, "bundle config unset local.myrack")
+    end
+
     it "chooses the local repository on runtime" do
       build_git "myrack", "0.8"
 
