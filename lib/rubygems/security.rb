@@ -361,7 +361,7 @@ module Gem::Security
   # See NIST FIPS 204 Section 4 (Parameter Sets).
   # https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.204.pdf
   # See Security (Evaluation Criteria) - 4.A.5 Security Strength Categories.
-  # https://csrc.nist.gov/projects/post-quantum-cryptography/post-quantum-cryptography-standardization/evaluation-criteria/security-(evaluation-criteria)
+  # https://csrc.nist.gov/projects/post-quantum-cryptography/post-quantum-cryptography-standardization/evaluation-criteria/security-%28evaluation-criteria%29
 
   ML_DSA_44_NAME = "ML-DSA-44"
   ML_DSA_65_NAME = "ML-DSA-65"
