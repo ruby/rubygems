@@ -327,6 +327,22 @@ class TestGemCommandsUninstallCommand < Gem::InstallerTestCase
     assert_match "uninstalled a-1",  ui.output
   end
 
+  def test_uninstall_invalid_selection
+    install_specs util_spec("foo", "1"), util_spec("foo", "2")
+    ui = Gem::MockGemUi.new "\n"
+    @cmd.options[:args] = ["foo"]
+
+    use_ui ui do
+      e = assert_raise Gem::MockGemUi::TermError do
+        @cmd.execute
+      end
+      assert_equal 1, e.exit_code
+    end
+
+    assert_equal "> Error: must enter a number [1-3]\n", ui.output.lines.last
+    assert_empty ui.error
+  end
+
   def test_uninstall_selection_multiple_gems
     ui = Gem::MockGemUi.new "1\n"
 

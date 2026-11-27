@@ -675,6 +675,21 @@ create_makefile '#{@spec.name}'
     assert_match "uninstalled a-1",  ui.output
   end
 
+  def test_uninstall_invalid_selection
+    install_specs util_spec("foo", "1"), util_spec("foo", "2")
+
+    ["\n", "9\n", ""].each do |input|
+      use_ui Gem::MockGemUi.new(input) do
+        e = assert_raise Gem::Uninstaller::InvalidSelectionError, "input: #{input.inspect}" do
+          Gem::Uninstaller.new("foo").uninstall
+        end
+        assert_equal "Error: must enter a number [1-3]", e.message
+      end
+
+      assert_equal %w[foo-1 foo-2], Gem::Specification.find_all_by_name("foo").map(&:full_name).sort
+    end
+  end
+
   def test_uninstall_selection_greater_than_one
     util_make_gems
 

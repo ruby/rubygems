@@ -26,6 +26,11 @@ class Gem::Uninstaller
   include Gem::InstallerUninstallerUtils
 
   ##
+  # Raised when the user does not select a valid option at the version prompt.
+
+  class InvalidSelectionError < Gem::InstallError; end
+
+  ##
   # The directory a gem's executables will be installed into
 
   attr_reader :bin_dir
@@ -144,7 +149,7 @@ class Gem::Uninstaller
       elsif index && index >= 0 && index < list.size
         uninstall_gem list[index]
       else
-        say "Error: must enter a number [1-#{list.size + 1}]"
+        raise InvalidSelectionError, "Error: must enter a number [1-#{list.size + 1}]"
       end
     else
       uninstall_gem list.first

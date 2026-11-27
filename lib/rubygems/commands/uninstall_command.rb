@@ -186,6 +186,9 @@ that is a dependency of an existing gem.  You can use the
 
   def uninstall_gem(gem_name)
     uninstall(gem_name)
+  rescue Gem::Uninstaller::InvalidSelectionError => e
+    say e.message
+    terminate_interaction 1
   rescue Gem::GemNotInHomeException => e
     spec = e.spec
     alert("In order to remove #{spec.name}, please execute:\n" \
