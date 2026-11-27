@@ -1496,6 +1496,103 @@ RSpec.describe "bundle install with specific platforms" do
     bundle :install
   end
 
+  it "does not drop ruby variants when a dependency is removed, even if ruby is not one of the PLATFORMS" do
+    remote = "https://gem.repo4"
+    platform = "x86_64-linux"
+
+    sorbet_static_version = "0.6.13646"
+    racc_version = "1.8.1"
+    excon_version = "1.9.0"
+
+    simulate_platform platform do
+      build_repo4 do
+        # This `sorbet-static` dependency is not strictly needed for the test.
+        # It's included here mainly to motivate why a lockfile might not
+        # declare ruby as a supported platform (because `sorbet-static` does
+        # not support a ruby variant)
+        build_gem "sorbet-static", sorbet_static_version do |s|
+          s.platform = platform
+        end
+
+        # The lockfile might include other gems with both ruby variants and
+        # platform-specific variants.  Even though we prefer platform-specific
+        # variants, we don't want to drop the ruby variants because they're a
+        # useful fallback if the platform-specific variant is unavailable for
+        # any reason.
+        build_gem "racc", racc_version
+        build_gem "racc", racc_version do |s|
+          s.platform = platform
+        end
+
+        build_gem "excon", excon_version
+      end
+
+      # `excon` is missing from the `Gemfile`, so we trigger the deletion-only
+      # code path
+      gemfile <<~G
+        source "#{remote}"
+
+        gem "racc", "#{racc_version}"
+        gem "sorbet-static", "#{sorbet_static_version}"
+      G
+
+      checksums = checksums_section_when_enabled do |c|
+        c.checksum gem_repo4, "excon", excon_version
+        c.checksum gem_repo4, "racc", racc_version
+        c.checksum gem_repo4, "racc", racc_version, platform
+        c.checksum gem_repo4, "sorbet-static", sorbet_static_version, platform
+      end
+
+      lockfile <<~L
+        GEM
+          remote: #{remote}/
+          specs:
+            excon (#{excon_version})
+            racc (#{racc_version})
+            racc (#{racc_version}-#{platform})
+            sorbet-static (#{sorbet_static_version}-#{platform})
+
+        PLATFORMS
+          #{platform}
+
+        DEPENDENCIES
+          excon (= #{excon_version})
+          racc (= #{racc_version})
+          sorbet-static (= #{sorbet_static_version})
+        #{checksums}
+        BUNDLED WITH
+          #{Bundler::VERSION}
+      L
+
+      bundle :install
+
+      checksums = checksums_section_when_enabled do |c|
+        c.checksum gem_repo4, "racc", racc_version
+        c.checksum gem_repo4, "racc", racc_version, platform
+        c.checksum gem_repo4, "sorbet-static", sorbet_static_version, platform
+      end
+
+      expect(lockfile).to eq(<<~L)
+        GEM
+          remote: #{remote}/
+          specs:
+            racc (#{racc_version})
+            racc (#{racc_version}-#{platform})
+            sorbet-static (#{sorbet_static_version}-#{platform})
+
+        PLATFORMS
+          #{platform}
+
+        DEPENDENCIES
+          racc (= #{racc_version})
+          sorbet-static (= #{sorbet_static_version})
+        #{checksums}
+        BUNDLED WITH
+          #{Bundler::VERSION}
+      L
+    end
+  end
+
   it "automatically adds the ruby variant to the lockfile if the specific platform is locked and we move to a newer ruby version for which a native package is not available" do
     #
     # Given an existing application using native gems (e.g., nokogiri)
