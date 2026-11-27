@@ -57,6 +57,14 @@ class Gem::Resolver::IndexSpecification < Gem::Resolver::Specification
     spec.required_rubygems_version || Gem::Requirement.default
   end
 
+  ##
+  # The index already lists the platform, so the full Specification is not
+  # needed to tell if the gem is installable on this platform.
+
+  def installable_platform? # :nodoc:
+    Gem::Platform.match_gem? @platform, @name
+  end
+
   def ==(other)
     self.class === other &&
       @name == other.name &&
