@@ -35,6 +35,20 @@ RSpec.describe Bundler::Fetcher::CompactIndex do
       compact_index.specs_for_names(["lskdjf"])
     end
 
+    it "retains excluded version rows but only expands eligible dependencies" do
+      target_rows = [
+        ["target", "1.0", nil, [["used", ["= 1.0"]]], [["checksum", ["abc"]]]],
+        ["target", "2.0", nil, [["unused", ["= 1.0"]]], [["checksum", ["def"]]]],
+      ]
+      used_rows = [["used", "1.0", nil, [], []]]
+      compact_index.metadata_requirements = { "target" => Gem::Requirement.new("< 2.0") }
+      expect(compact_index_client).to receive(:info).with("target").and_return(target_rows)
+      expect(compact_index_client).to receive(:info).with("used").and_return(used_rows)
+      expect(compact_index_client).not_to receive(:info).with("unused")
+
+      expect(compact_index.specs_for_names(["target"])).to eq(target_rows + used_rows)
+    end
+
     describe "#available?" do
       it "returns true" do
         expect(compact_index).to be_available

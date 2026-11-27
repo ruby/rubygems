@@ -58,6 +58,149 @@ RSpec.describe "compact index api" do
     )
   end
 
+  context "with requirements excluding some versions" do
+    before do
+      build_repo4 do
+        build_gem "target", "1.0" do |s|
+          s.add_dependency "used", "= 1.0"
+        end
+        build_gem "target", "2.0" do |s|
+          s.add_dependency "unused", "= 1.0"
+        end
+        build_gem "used", "1.0"
+        build_gem "unused", "1.0" do |s|
+          s.add_dependency "unused_child", "= 1.0"
+        end
+        build_gem "unused_child", "1.0"
+        build_gem "other", "1.0" do |s|
+          s.add_dependency "unused", "= 1.0"
+        end
+        build_gem "parent", "1.0" do |s|
+          s.add_dependency "target", ">= 0"
+        end
+      end
+    end
+
+    ["= 1.0", "< 2.0"].each do |requirement|
+      it "does not fetch an excluded subtree for #{requirement}" do
+        gemfile <<~G
+          source "https://gem.repo4"
+          gem "target", "#{requirement}"
+        G
+        bundle "lock --verbose", artifice: "compact_index"
+
+        expect(lockfile).to include("target (1.0)", "used (1.0)")
+        expect(out).to include("/info/target", "/info/used")
+        expect(out).not_to include("/info/unused")
+
+        bundle "lock --update target --verbose", artifice: "compact_index"
+
+        expect(lockfile).to include("target (1.0)", "used (1.0)")
+        expect(out).not_to include("/info/unused")
+      end
+    end
+
+    it "keeps a subtree that another dependency needs" do
+      gemfile <<~G
+        source "https://gem.repo4"
+        gem "target", "= 1.0"
+        gem "other"
+      G
+      bundle "lock --verbose", artifice: "compact_index"
+
+      expect(lockfile).to include("target (1.0)", "unused (1.0)", "unused_child (1.0)")
+      expect(out).to include("/info/unused")
+    end
+
+    it "does not mistake a loose requirement for a fixed version" do
+      gemfile <<~G
+        source "https://gem.repo4"
+        gem "target", ">= 1.0"
+      G
+      bundle "lock --verbose", artifice: "compact_index"
+
+      expect(lockfile).to include("target (2.0)", "unused_child (1.0)")
+      expect(out).to include("/info/unused")
+    end
+
+    it "does not use an inactive platform requirement", :mri_only do
+      gemfile <<~G
+        source "https://gem.repo4"
+        gem "parent"
+        platforms :jruby do
+          gem "target", "= 1.0"
+        end
+      G
+      bundle "lock --verbose", artifice: "compact_index"
+
+      expect(lockfile).to include("target (2.0)", "unused_child (1.0)")
+    end
+
+    it "falls back when an override changes the hard requirement" do
+      gemfile <<~G
+        source "https://gem.repo4"
+        gem "target", "= 1.0"
+        override "target", version: "= 2.0"
+      G
+      bundle "lock --verbose", artifice: "compact_index"
+
+      expect(lockfile).to include("target (2.0)", "unused_child (1.0)")
+    end
+
+    it "does not apply one platform's constraint to every locked platform", :mri_only do
+      gemfile <<~G
+        source "https://gem.repo4"
+        gem "parent"
+        platforms :ruby do
+          gem "target", "= 1.0"
+        end
+      G
+      bundle "lock --add-platform java --verbose", artifice: "compact_index"
+
+      expect(out).to include("/info/unused")
+    end
+
+    it "uses a changed manifest's requirements on the next CLI invocation" do
+      gemfile <<~G
+        source "https://gem.repo4"
+        gem "target", "= 1.0"
+      G
+      bundle "lock", artifice: "compact_index"
+      gemfile <<~G
+        source "https://gem.repo4"
+        gem "target", "= 2.0"
+      G
+      bundle "lock --update target --verbose", artifice: "compact_index"
+
+      expect(lockfile).to include("target (2.0)", "unused_child (1.0)")
+      expect(out).to include("/info/unused")
+    end
+
+    it "does not remove available-version information for missing targets" do
+      gemfile <<~G
+        source "https://gem.repo4"
+        gem "target", "= 3.0"
+      G
+      bundle "lock --verbose", artifice: "compact_index", raise_on_error: false
+
+      expect(err).to include("target (= 3.0)", "target-1.0", "target-2.0")
+      expect(out).not_to include("/info/unused")
+    end
+
+    it "does not prune explicitly source-scoped dependency metadata" do
+      gemfile <<~G
+        source "https://gem.repo1"
+        source "https://gem.repo4" do
+          gem "target", "= 1.0"
+        end
+      G
+      bundle "lock --verbose", artifice: "compact_index"
+
+      expect(lockfile).to include("target (1.0)", "used (1.0)")
+      expect(out).to include("/info/unused")
+    end
+  end
+
   it "should handle case sensitivity conflicts" do
     build_repo4(build_compact_index: false) do
       build_gem "myrack", "1.0" do |s|
