@@ -151,7 +151,8 @@ module Gem
   ##
   # The path to the global gem cache directory.
   # This is used when global_gem_cache is enabled to share .gem files
-  # across all Ruby installations.
+  # across all Ruby installations. Each source has its own subdirectory
+  # in it, named by Gem::RemoteFetcher and Bundler alike.
 
   def self.global_gem_cache_path
     File.join(cache_home, "gem", "gems")
