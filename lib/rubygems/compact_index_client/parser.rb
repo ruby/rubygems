@@ -45,7 +45,12 @@ class Gem::CompactIndexClient
     end
 
     def parse_info(data, name)
-      lines(data).map {|line| gem_parser.parse(line).unshift(name) }
+      lines(data).filter_map do |line|
+        next if line.strip.empty? # see #parse_version_checksum
+        version, platform, dependencies, requirements = gem_parser.parse(line)
+        next unless Gem::Version.correct?(version) # skip lines that do not start with a version
+        [name, version, platform, dependencies, requirements]
+      end
     end
 
     def available?
