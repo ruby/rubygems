@@ -2369,6 +2369,62 @@ RSpec.describe "bundle lock" do
     L
   end
 
+  it "adds checksums for gems in optional groups" do
+    build_repo4 do
+      build_gem "foo", "1.0"
+    end
+
+    gemfile <<~G
+      source "https://gem.repo4"
+
+      group :optional, optional: true do
+        gem "foo"
+      end
+    G
+
+    bundle "lock", env: { "BUNDLE_LOCKFILE_CHECKSUMS" => "false" }
+    bundle "lock --add-checksums"
+
+    checksums = checksums_section do |c|
+      c.checksum gem_repo4, "foo", "1.0"
+    end
+
+    expect(lockfile).to include(checksums.to_s)
+
+    bundle "install", env: { "BUNDLE_FROZEN" => "true", "BUNDLE_WITH" => "optional" }
+    expect(the_bundle).to include_gems("foo 1.0", env: { "BUNDLE_WITH" => "optional" })
+  end
+
+  it "adds checksums for an excluded group's scoped source" do
+    build_repo4 do
+      build_gem "foo", "1.0"
+    end
+
+    gemfile <<~G
+      source "https://gem.repo1"
+      gem "myrack"
+
+      group :test do
+        source "https://gem.repo4" do
+          gem "foo"
+        end
+      end
+    G
+
+    bundle "lock", artifice: "compact_index", env: { "BUNDLE_LOCKFILE_CHECKSUMS" => "false", "BUNDLE_WITHOUT" => "test" }
+    bundle "lock --add-checksums", artifice: "compact_index", env: { "BUNDLE_WITHOUT" => "test" }
+
+    checksums = checksums_section do |c|
+      c.checksum gem_repo4, "foo", "1.0"
+      c.checksum gem_repo1, "myrack", "1.0.0"
+    end
+
+    expect(lockfile).to include(checksums.to_s)
+
+    bundle "install", artifice: "compact_index", env: { "BUNDLE_FROZEN" => "true" }
+    expect(the_bundle).to include_gems("foo 1.0", "myrack 1.0.0")
+  end
+
   it "adds checksums when source is not specified" do
     system_gems(%w[myrack-1.0.0], path: default_bundle_path)
 
