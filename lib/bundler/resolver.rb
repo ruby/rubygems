@@ -57,6 +57,11 @@ module Bundler
         specs[name] = matches.sort_by {|s| [s.version, s.platform.to_s] }
       end
 
+      # Cache for requirement_to_range to avoid redundant calculations
+      @range_for_requirement = Hash.new do |ranges, requirement|
+        ranges[requirement] = requirement_to_range(requirement)
+      end
+
       @all_versions = Hash.new do |candidates, package|
         candidates[package] = all_versions_for(package)
       end
@@ -236,7 +241,7 @@ module Bundler
       range = if repository_for(package).is_a?(Source::Gemspec)
         Gem::PubGrub::VersionRange.any
       else
-        requirement_to_range(dependency)
+        @range_for_requirement[dependency.requirements]
       end
 
       Gem::PubGrub::VersionConstraint.new(package, range: range)
@@ -722,8 +727,8 @@ module Bundler
       message
     end
 
-    def requirement_to_range(requirement)
-      ranges = requirement.requirements.map do |(op, version)|
+    def requirement_to_range(requirements)
+      ranges = requirements.map do |(op, version)|
         ver = Resolver::Candidate.new(version, priority: -1)
         platform_ver = Resolver::Candidate.new(version, priority: 1)
 
