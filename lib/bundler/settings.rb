@@ -8,6 +8,7 @@ module Bundler
 
     BOOL_KEYS = %w[
       auto_install
+      build_path_extensions
       cache_all
       cache_all_platforms
       clean
