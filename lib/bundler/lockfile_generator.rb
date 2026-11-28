@@ -32,6 +32,10 @@ module Bundler
     private
 
     def add_sources
+      # Resolve before writing any source: resolving unlocks the git sources
+      # given to `--update`, which changes the revision their header locks.
+      resolve = definition.resolve
+
       definition.sources.lock_sources.each_with_index do |source, idx|
         out << "\n" unless idx.zero?
 
@@ -39,7 +43,7 @@ module Bundler
         out << source.to_lock
 
         # Find all specs for this source
-        specs = definition.resolve.select {|s| source.can_lock?(s) }
+        specs = resolve.select {|s| source.can_lock?(s) }
         add_specs(specs)
       end
     end

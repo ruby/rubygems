@@ -82,6 +82,27 @@ RSpec.describe "bundle lock with git gems" do
     expect(out).to eq("WIN")
   end
 
+  it "updates every git source given to --update, including the first one in the lockfile" do
+    build_git "bar"
+    build_git "foo"
+
+    install_gemfile <<-G
+      source "https://gem.repo1"
+      gem "bar", :git => "#{lib_path("bar-1.0")}"
+      gem "foo", :git => "#{lib_path("foo-1.0")}"
+    G
+
+    # New commits on both branches: the lockfile still pins the previous ones
+    update_git "bar"
+    update_git "foo"
+
+    # bar's source sorts first in the lockfile, so its header is written first
+    bundle "lock --update bar foo"
+
+    expect(lockfile).to include("revision: #{revision_for(lib_path("bar-1.0"))}")
+    expect(lockfile).to include("revision: #{revision_for(lib_path("foo-1.0"))}")
+  end
+
   it "properly clones a git source locked to an out of date ref" do
     install_gemfile_with_foo_as_a_git_dependency
 
