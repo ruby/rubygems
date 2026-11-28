@@ -3,7 +3,7 @@ bundle-binstubs(1) -- Install the binstubs of the listed gems
 
 ## SYNOPSIS
 
-`bundle binstubs` <GEM_NAME> [--force] [--standalone] [--all-platforms]
+`bundle binstubs` <GEM_NAME> [--force] [--gemfile=GEMFILE] [--standalone] [--all-platforms]
 
 ## DESCRIPTION
 
@@ -27,6 +27,9 @@ all given gems.
 
 * `--force`:
   Overwrite existing binstubs if they exist.
+
+* `--gemfile=GEMFILE`:
+  Use the specified gemfile instead of `Gemfile`.
 
 * `--standalone`:
   Makes binstubs that can work without depending on Rubygems or Bundler at

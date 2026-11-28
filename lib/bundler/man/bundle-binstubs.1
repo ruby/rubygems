@@ -4,7 +4,7 @@
 .SH "NAME"
 \fBbundle\-binstubs\fR \- Install the binstubs of the listed gems
 .SH "SYNOPSIS"
-\fBbundle binstubs\fR \fIGEM_NAME\fR [\-\-force] [\-\-standalone] [\-\-all\-platforms]
+\fBbundle binstubs\fR \fIGEM_NAME\fR [\-\-force] [\-\-gemfile=GEMFILE] [\-\-standalone] [\-\-all\-platforms]
 .SH "DESCRIPTION"
 Binstubs are scripts that wrap around executables\. Bundler creates a small Ruby file (a binstub) that loads Bundler, runs the command, and puts it into \fBbin/\fR\. Binstubs are a shortcut\-or alternative\- to always using \fBbundle exec\fR\. This gives you a file that can be run directly, and one that will always run the correct gem version used by the application\.
 .P
@@ -15,6 +15,9 @@ This command generates binstubs for executables in \fBGEM_NAME\fR\. Binstubs are
 .TP
 \fB\-\-force\fR
 Overwrite existing binstubs if they exist\.
+.TP
+\fB\-\-gemfile=GEMFILE\fR
+Use the specified gemfile instead of \fBGemfile\fR\.
 .TP
 \fB\-\-standalone\fR
 Makes binstubs that can work without depending on Rubygems or Bundler at runtime\.
