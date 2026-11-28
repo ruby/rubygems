@@ -427,6 +427,29 @@ RSpec.describe Bundler::LockfileParser do
       include_examples "parsing"
     end
 
+    [
+      ["a digest of an unknown algorithm that is neither hex nor base64", "sha512=not\rhex,sha256="],
+      ["an algorithm name with non-alphanumeric characters", "sha\e512=abcdef,sha256="],
+      ["a checksum with no digest", "sha512,sha256="],
+      ["an empty checksum", ",sha256="],
+    ].each do |description, replacement|
+      context "with #{description}" do
+        let(:lockfile_contents) { super().sub("sha256=", replacement) }
+
+        it "raises a LockfileError pointing at the line" do
+          expect { subject }.to raise_error(Bundler::LockfileError, /error occurred while evaluating #{Regexp.escape(lockfile_path)}:\d+:\d+/)
+        end
+      end
+    end
+
+    context "with a sha256 checksum that has no digest" do
+      let(:lockfile_contents) { super().sub(/sha256=\h+/, "sha256") }
+
+      it "raises a LockfileError pointing at the line" do
+        expect { subject }.to raise_error(Bundler::LockfileError, /error occurred while evaluating #{Regexp.escape(lockfile_path)}:\d+:\d+/)
+      end
+    end
+
     context "when the content does not contain any recognized lockfile sections" do
       let(:lockfile_contents) { "hello world\nlorem ipsum\n" }
 
