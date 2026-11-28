@@ -12,6 +12,11 @@ module Bundler
       @options = options
     end
 
+    # @return [Dependency] a copy of this dependency with another requirement.
+    def with_requirement(requirement)
+      self.class.new(name, requirement, @options)
+    end
+
     def groups
       @groups ||= Array(@options["group"] || :default).map(&:to_sym)
     end

@@ -152,6 +152,8 @@ module Spec
         "spec/commands/outdated_filters_spec.rb",
         "spec/commands/update_spec.rb",
         "spec/commands/update_scenarios_spec.rb",
+        "spec/commands/bump_spec.rb",
+        "spec/bundler/gemfile_requirement_rewriter_spec.rb",
         "spec/install/deploy_spec.rb",
         "spec/install/gemfile/sources_spec.rb",
         "spec/runtime/self_management_spec.rb",
