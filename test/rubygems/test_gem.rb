@@ -853,6 +853,71 @@ class TestGem < Gem::TestCase
     assert_equal Gem::Version.new(2), version
   end
 
+  def util_cooldown_time(days_ago)
+    (Time.now - days_ago * 86_400).utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+  end
+
+  def util_setup_cooldown_repo(created_at)
+    spec_fetcher
+
+    specs = created_at.keys.map {|full_name| util_spec "a", full_name.delete_prefix("a-") }
+    util_setup_compact_index(*specs, created_at: created_at.compact)
+
+    write_marshalled_gemspecs(*specs)
+
+    # drop the in-memory tuples spec_fetcher pre-populated so the lookup
+    # goes through Gem::Source#load_specs
+    Gem::SpecFetcher.fetcher = nil
+  end
+
+  def test_self_latest_version_for_cooldown_nil
+    util_setup_cooldown_repo "a-1" => util_cooldown_time(30),
+                             "a-2" => util_cooldown_time(1),
+                             "a-3.a" => util_cooldown_time(30) # prerelease
+
+    assert_equal Gem::Version.new(2), Gem.latest_version_for("a", cooldown: nil)
+  end
+
+  def test_self_latest_version_for_cooldown
+    util_setup_cooldown_repo "a-0.9" => util_cooldown_time(60),
+                             "a-1" => util_cooldown_time(30),
+                             "a-2" => util_cooldown_time(1),
+                             "a-3.a" => util_cooldown_time(30) # prerelease
+
+    assert_equal Gem::Version.new(1), Gem.latest_version_for("a", cooldown: 7)
+  end
+
+  def test_self_latest_version_for_cooldown_zero
+    util_setup_cooldown_repo "a-1" => util_cooldown_time(30),
+                             "a-2" => util_cooldown_time(1)
+
+    assert_equal Gem::Version.new(2), Gem.latest_version_for("a", cooldown: 0)
+  end
+
+  def test_self_latest_version_for_cooldown_only_version_within_period
+    util_setup_cooldown_repo "a-1" => util_cooldown_time(1)
+
+    assert_nil Gem.latest_version_for("a", cooldown: 7)
+  end
+
+  def test_self_latest_version_for_cooldown_missing_created_at_fails_open
+    util_setup_cooldown_repo "a-1" => nil, "a-2" => nil
+
+    use_ui @ui do
+      assert_equal Gem::Version.new(2), Gem.latest_version_for("a", cooldown: 7)
+    end
+
+    assert_equal 1, @ui.error.scan("publish times").size
+  end
+
+  def test_self_latest_version_for_cooldown_invalid
+    e = assert_raise ArgumentError do
+      Gem.latest_version_for "a", cooldown: -1
+    end
+
+    assert_equal "invalid cooldown -1, expected a non-negative integer number of days", e.message
+  end
+
   def test_self_loaded_specs
     foo = util_spec "foo"
     install_gem foo
