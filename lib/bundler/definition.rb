@@ -1477,6 +1477,13 @@ module Bundler
       sources.git_sources - needed_git_sources
     end
 
+    # The locked sources of gems that aren't being unlocked, and whose source isn't either
+    def locked_requirements_to_keep
+      source_map.locked_requirements.reject do |name, source|
+        @gems_to_unlock.include?(name) || @sources_to_unlock.include?(source.name)
+      end
+    end
+
     def find_source_requirements
       preload_git_sources
 
@@ -1491,7 +1498,12 @@ module Bundler
         all_requirements = source_map.all_requirements(excluded)
         { default: default_source }.merge(all_requirements)
       else
-        { default: Source::RubygemsAggregate.new(sources, source_map, excluded) }.merge(source_map.direct_requirements)
+        requirements = { default: Source::RubygemsAggregate.new(sources, source_map, excluded) }
+        # Without a dependency API, as in a local resolution, every installed gem is in every
+        # source, so the aggregate can't tell where an indirect dependency comes from. Keep the
+        # source it was locked from.
+        requirements.merge!(locked_requirements_to_keep) unless nothing_changed
+        requirements.merge(source_map.direct_requirements)
       end
       source_requirements.merge!(source_map.locked_requirements) if nothing_changed
       metadata_dependencies.each do |dep|
